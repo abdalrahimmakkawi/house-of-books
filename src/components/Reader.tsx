@@ -17,6 +17,9 @@ export default function Reader({ book, onClose }: ReaderProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [narrationUrl, setNarrationUrl] = useState<string | null>(null);
+  const [isUsingSpeechSynthesis, setIsUsingSpeechSynthesis] = useState(false);
+  const [isSpeechPlaying, setIsSpeechPlaying] = useState(false);
+  const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
   
   // Typography Settings
   const [settings, setSettings] = useState<ReaderSettings>(() => {
@@ -56,21 +59,73 @@ export default function Reader({ book, onClose }: ReaderProps) {
   };
 
   const handleStartNarration = async () => {
+    // If we're currently using speech synthesis, just toggle it
+    if (isUsingSpeechSynthesis) {
+      if (isSpeechPlaying) {
+        window.speechSynthesis.pause();
+        setIsSpeechPlaying(false);
+      } else {
+        window.speechSynthesis.resume();
+        setIsSpeechPlaying(true);
+      }
+      return;
+    }
+
+    // If we have a generated narration URL, use it
     if (narrationUrl) {
       togglePlay(narrationUrl);
       return;
     }
 
     setIsGenerating(true);
-    const url = await generateBookNarration(`${book.title} by ${book.author}. ${book.summary}`);
+    
+    // Create full text for narration (title + author + summary + key insights)
+    const fullNarrationText = `${book.title} by ${book.author}. ${book.summary}. Key insights: ${book.keyInsights.join(' ')}`;
+    
+    const url = await generateBookNarration(fullNarrationText);
     setIsGenerating(false);
     
     if (url) {
       setNarrationUrl(url);
       togglePlay(url);
     } else {
-      alert("Could not generate narration. Playing placeholder music instead.");
-      togglePlay('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3');
+      // Fallback to Web Speech API
+      console.log("Audio generation failed, using Web Speech API fallback");
+      useSpeechSynthesisFallback(fullNarrationText);
+    }
+  };
+
+  const useSpeechSynthesisFallback = (text: string) => {
+    if ('speechSynthesis' in window) {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9; // Slightly slower for better comprehension
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      
+      utterance.onstart = () => {
+        setIsUsingSpeechSynthesis(true);
+        setIsSpeechPlaying(true);
+      };
+      
+      utterance.onend = () => {
+        setIsUsingSpeechSynthesis(false);
+        setIsSpeechPlaying(false);
+      };
+      
+      utterance.onerror = (event) => {
+        console.error('Speech synthesis error:', event);
+        setIsUsingSpeechSynthesis(false);
+        setIsSpeechPlaying(false);
+        alert("Speech synthesis is not available. Please try again later.");
+      };
+      
+      speechSynthesisRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+    } else {
+      alert("Speech synthesis is not supported in your browser.");
     }
   };
 
@@ -93,6 +148,17 @@ export default function Reader({ book, onClose }: ReaderProps) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
+
+  // Cleanup speech synthesis on unmount
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const currentlyPlaying = isUsingSpeechSynthesis ? isSpeechPlaying : isPlaying;
 
   const handleShare = async () => {
     const shareData = {
@@ -301,12 +367,12 @@ export default function Reader({ book, onClose }: ReaderProps) {
               >
                 {isGenerating ? (
                   <Loader2 size={18} className="animate-spin" />
-                ) : isPlaying ? (
+                ) : currentlyPlaying ? (
                   <Pause size={18} fill="currentColor" />
                 ) : (
                   <Play size={18} fill="currentColor" />
                 )}
-                {isGenerating ? 'Generating Narration...' : isPlaying ? 'Pause Narration' : 'Listen to Summary'}
+                {isGenerating ? 'Generating Narration...' : currentlyPlaying ? 'Pause Narration' : 'Listen to Summary'}
               </button>
               <div className="text-sm text-stone-400 font-medium">
                 {book.readTime} min read • 8 key insights
@@ -317,7 +383,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
 
         {/* Audio Player Bar (Floating when playing) */}
         <AnimatePresence>
-          {isPlaying && (
+          {currentlyPlaying && (
             <motion.div 
               initial={{ y: 100 }}
               animate={{ y: 0 }}
@@ -331,8 +397,20 @@ export default function Reader({ book, onClose }: ReaderProps) {
                     <p className="text-xs font-bold dark:text-white nature:text-emerald-50 truncate max-w-[150px]">{book.title}</p>
                     <div className="flex items-center gap-4">
                       <SkipBack size={16} className="text-stone-400 cursor-pointer hover:text-stone-600" />
-                      <button onClick={() => togglePlay()}>
-                        {isPlaying ? <Pause size={20} className="dark:text-white nature:text-emerald-50" /> : <Play size={20} className="dark:text-white nature:text-emerald-50" />}
+                      <button onClick={() => {
+                        if (isUsingSpeechSynthesis) {
+                          if (isSpeechPlaying) {
+                            window.speechSynthesis.pause();
+                            setIsSpeechPlaying(false);
+                          } else {
+                            window.speechSynthesis.resume();
+                            setIsSpeechPlaying(true);
+                          }
+                        } else {
+                          togglePlay();
+                        }
+                      }}>
+                        {currentlyPlaying ? <Pause size={20} className="dark:text-white nature:text-emerald-50" /> : <Play size={20} className="dark:text-white nature:text-emerald-50" />}
                       </button>
                       <SkipForward size={16} className="text-stone-400 cursor-pointer hover:text-stone-600" />
                     </div>
