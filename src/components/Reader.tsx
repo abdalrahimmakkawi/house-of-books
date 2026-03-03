@@ -4,7 +4,7 @@ import { X, ChevronLeft, Bookmark, Share2, Play, Pause, BookOpen, List, Info, Sk
 import { Book, Theme, ReaderSettings } from '../types';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useTheme, AMBIENT_SOUNDS } from '../contexts/ThemeContext';
-import { generateBookNarration, askBookQuestion } from '../services/geminiService';
+import { generateBookNarration, askBookQuestion, expandBookContent } from '../services/geminiService';
 
 interface ReaderProps {
   book: Book;
@@ -17,9 +17,9 @@ export default function Reader({ book, onClose }: ReaderProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [narrationUrl, setNarrationUrl] = useState<string | null>(null);
-  const [isUsingSpeechSynthesis, setIsUsingSpeechSynthesis] = useState(false);
-  const [isSpeechPlaying, setIsSpeechPlaying] = useState(false);
-  const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const [fullNarration, setFullNarration] = useState<string | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechProgress, setSpeechProgress] = useState(0);
   
   // Typography Settings
   const [settings, setSettings] = useState<ReaderSettings>(() => {
@@ -59,73 +59,91 @@ export default function Reader({ book, onClose }: ReaderProps) {
   };
 
   const handleStartNarration = async () => {
-    // If we're currently using speech synthesis, just toggle it
-    if (isUsingSpeechSynthesis) {
-      if (isSpeechPlaying) {
-        window.speechSynthesis.pause();
-        setIsSpeechPlaying(false);
+    const synth = window.speechSynthesis;
+
+    // If already speaking, handle pause/resume
+    if (isSpeaking) {
+      if (synth.paused) {
+        synth.resume();
       } else {
-        window.speechSynthesis.resume();
-        setIsSpeechPlaying(true);
+        synth.pause();
       }
       return;
     }
 
-    // If we have a generated narration URL, use it
-    if (narrationUrl) {
-      togglePlay(narrationUrl);
+    // If we have the narration text already, just play it
+    if (fullNarration) {
+      playSpeech(fullNarration);
       return;
     }
 
     setIsGenerating(true);
-    
-    // Create full text for narration (title + author + summary + key insights)
-    const fullNarrationText = `${book.title} by ${book.author}. ${book.summary}. Key insights: ${book.keyInsights.join(' ')}`;
-    
-    const url = await generateBookNarration(fullNarrationText);
-    setIsGenerating(false);
-    
-    if (url) {
-      setNarrationUrl(url);
-      togglePlay(url);
-    } else {
-      // Fallback to Web Speech API
-      console.log("Audio generation failed, using Web Speech API fallback");
-      useSpeechSynthesisFallback(fullNarrationText);
+    try {
+      const expandedText = await expandBookContent(book.title, book.author, book.summary, book.keyInsights);
+      setIsGenerating(false);
+      
+      if (expandedText) {
+        const wordCount = expandedText.split(/\s+/).length;
+        console.log("Narration generated. Word count:", wordCount);
+        console.log("Text preview:", expandedText.substring(0, 200) + "...");
+        
+        setFullNarration(expandedText);
+        playSpeech(expandedText);
+      } else {
+        alert("Could not generate expanded narration. Playing standard summary instead.");
+        const shortText = `${book.title} by ${book.author}. ${book.summary}`;
+        setFullNarration(shortText);
+        playSpeech(shortText);
+      }
+    } catch (error) {
+      console.error("Error in narration flow:", error);
+      setIsGenerating(false);
     }
   };
 
-  const useSpeechSynthesisFallback = (text: string) => {
-    if ('speechSynthesis' in window) {
-      // Cancel any ongoing speech
-      window.speechSynthesis.cancel();
+  const playSpeech = (text: string) => {
+    const synth = window.speechSynthesis;
+    synth.cancel(); // Stop any current speech
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.85;
+    utterance.lang = 'en-US';
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setSpeechProgress(0);
+    };
+    utterance.onpause = () => setIsSpeaking(false);
+    utterance.onresume = () => setIsSpeaking(true);
+    
+    utterance.onboundary = (event) => {
+      if (event.name === 'word') {
+        const progress = (event.charIndex / text.length) * 100;
+        setSpeechProgress(progress);
+      }
+    };
+
+    // Wait for voices then select best
+    const loadVoices = () => {
+      const voices = synth.getVoices();
+      const best = 
+        voices.find(v => v.name === 'Google US English') ||
+        voices.find(v => v.name.includes('Samantha')) ||
+        voices.find(v => v.lang === 'en-US' && !v.localService) ||
+        voices.find(v => v.lang.startsWith('en'));
       
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9; // Slightly slower for better comprehension
-      utterance.pitch = 1;
-      utterance.volume = 1;
-      
-      utterance.onstart = () => {
-        setIsUsingSpeechSynthesis(true);
-        setIsSpeechPlaying(true);
-      };
-      
-      utterance.onend = () => {
-        setIsUsingSpeechSynthesis(false);
-        setIsSpeechPlaying(false);
-      };
-      
-      utterance.onerror = (event) => {
-        console.error('Speech synthesis error:', event);
-        setIsUsingSpeechSynthesis(false);
-        setIsSpeechPlaying(false);
-        alert("Speech synthesis is not available. Please try again later.");
-      };
-      
-      speechSynthesisRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
+      if (best) {
+        console.log("Selected voice:", best.name);
+        utterance.voice = best;
+      }
+      synth.speak(utterance);
+    };
+
+    if (synth.getVoices().length > 0) {
+      loadVoices();
     } else {
-      alert("Speech synthesis is not supported in your browser.");
+      synth.onvoiceschanged = loadVoices;
     }
   };
 
@@ -148,17 +166,6 @@ export default function Reader({ book, onClose }: ReaderProps) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
-
-  // Cleanup speech synthesis on unmount
-  useEffect(() => {
-    return () => {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, []);
-
-  const currentlyPlaying = isUsingSpeechSynthesis ? isSpeechPlaying : isPlaying;
 
   const handleShare = async () => {
     const shareData = {
@@ -367,12 +374,12 @@ export default function Reader({ book, onClose }: ReaderProps) {
               >
                 {isGenerating ? (
                   <Loader2 size={18} className="animate-spin" />
-                ) : currentlyPlaying ? (
+                ) : (isSpeaking || isPlaying) ? (
                   <Pause size={18} fill="currentColor" />
                 ) : (
                   <Play size={18} fill="currentColor" />
                 )}
-                {isGenerating ? 'Generating Narration...' : currentlyPlaying ? 'Pause Narration' : 'Listen to Summary'}
+                {isGenerating ? 'Generating Narration...' : (isSpeaking || isPlaying) ? 'Pause Narration' : 'Listen to Summary'}
               </button>
               <div className="text-sm text-stone-400 font-medium">
                 {book.readTime} min read • 8 key insights
@@ -383,7 +390,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
 
         {/* Audio Player Bar (Floating when playing) */}
         <AnimatePresence>
-          {currentlyPlaying && (
+          {(isPlaying || isSpeaking) && (
             <motion.div 
               initial={{ y: 100 }}
               animate={{ y: 0 }}
@@ -397,32 +404,21 @@ export default function Reader({ book, onClose }: ReaderProps) {
                     <p className="text-xs font-bold dark:text-white nature:text-emerald-50 truncate max-w-[150px]">{book.title}</p>
                     <div className="flex items-center gap-4">
                       <SkipBack size={16} className="text-stone-400 cursor-pointer hover:text-stone-600" />
-                      <button onClick={() => {
-                        if (isUsingSpeechSynthesis) {
-                          if (isSpeechPlaying) {
-                            window.speechSynthesis.pause();
-                            setIsSpeechPlaying(false);
-                          } else {
-                            window.speechSynthesis.resume();
-                            setIsSpeechPlaying(true);
-                          }
-                        } else {
-                          togglePlay();
-                        }
-                      }}>
-                        {currentlyPlaying ? <Pause size={20} className="dark:text-white nature:text-emerald-50" /> : <Play size={20} className="dark:text-white nature:text-emerald-50" />}
+                      <button onClick={() => isSpeaking ? handleStartNarration() : togglePlay()}>
+                        {(isPlaying || isSpeaking) ? <Pause size={20} className="dark:text-white nature:text-emerald-50" /> : <Play size={20} className="dark:text-white nature:text-emerald-50" />}
                       </button>
                       <SkipForward size={16} className="text-stone-400 cursor-pointer hover:text-stone-600" />
                     </div>
                   </div>
                   <div className="relative h-1 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden cursor-pointer" onClick={(e) => {
+                    if (isSpeaking) return; // Speech synthesis doesn't support easy seeking this way
                     const rect = e.currentTarget.getBoundingClientRect();
                     const x = e.clientX - rect.left;
                     seek((x / rect.width) * 100);
                   }}>
                     <div 
                       className="absolute top-0 left-0 h-full bg-emerald-600 transition-all duration-100"
-                      style={{ width: `${progress}%` }}
+                      style={{ width: `${isSpeaking ? speechProgress : progress}%` }}
                     />
                   </div>
                 </div>
