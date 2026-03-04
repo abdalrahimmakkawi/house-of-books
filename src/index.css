@@ -8,56 +8,61 @@
 }
 
 @layer base {
+  :root {
+    --bg-primary: #FDFCFB;
+    --text-primary: #1A1A1A;
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.2);
+  }
+
+  .dark {
+    --bg-primary: #0C0A09;
+    --text-primary: #FAFAF9;
+    --glass-bg: rgba(28, 25, 23, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.1);
+  }
+
+  .classic {
+    --bg-primary: #2C1E12;
+    --text-primary: #E6D5B8;
+    --glass-bg: rgba(44, 30, 18, 0.8);
+    --glass-border: rgba(230, 213, 184, 0.1);
+    --bg-gradient: radial-gradient(circle at center, #3D2B1B 0%, #1A120B 100%);
+  }
+
+  .nature {
+    --bg-primary: #0F1A0F;
+    --text-primary: #D1E8D1;
+    --glass-bg: rgba(15, 26, 15, 0.8);
+    --glass-border: rgba(209, 232, 209, 0.1);
+    --bg-gradient: radial-gradient(circle at center, #1A2E1A 0%, #080D08 100%);
+  }
+
+  .beach {
+    --bg-primary: #0A192F;
+    --text-primary: #CCD6F6;
+    --glass-bg: rgba(10, 25, 47, 0.8);
+    --glass-border: rgba(204, 214, 246, 0.1);
+    --bg-gradient: radial-gradient(circle at center, #112240 0%, #020C1B 100%);
+  }
+
   body {
-    @apply bg-[#FDFCFB] text-[#1A1A1A] antialiased transition-colors duration-500;
+    background-color: var(--bg-primary);
+    background-image: var(--bg-gradient, none);
+    color: var(--text-primary);
+    @apply antialiased transition-colors duration-500;
   }
 
-  /* Classic Theme - Ancient Library/Harry Potter vibe */
-  .classic body, .classic .reader-bg, .classic .main-bg {
-    background-color: #2C1E12 !important;
-    background-image: radial-gradient(circle at center, #3D2B1B 0%, #1A120B 100%) !important;
-    color: #E6D5B8;
+  .main-bg, .reader-bg {
+    background-color: var(--bg-primary) !important;
+    background-image: var(--bg-gradient, none) !important;
+    color: var(--text-primary) !important;
   }
 
-  .classic .glass {
-    background-color: rgba(44, 30, 18, 0.8) !important;
-    border-color: rgba(230, 213, 184, 0.1) !important;
-  }
-
-  /* Nature Theme - Forest vibe */
-  .nature body, .nature .reader-bg, .nature .main-bg {
-    background-color: #0F1A0F !important;
-    background-image: radial-gradient(circle at center, #1A2E1A 0%, #080D08 100%) !important;
-    color: #D1E8D1;
-  }
-
-  .nature .glass {
-    background-color: rgba(15, 26, 15, 0.8) !important;
-    border-color: rgba(209, 232, 209, 0.1) !important;
-  }
-
-  /* Beach Theme - Ocean vibe */
-  .beach body, .beach .reader-bg, .beach .main-bg {
-    background-color: #0A192F !important;
-    background-image: radial-gradient(circle at center, #112240 0%, #020C1B 100%) !important;
-    color: #CCD6F6;
-  }
-
-  .beach .glass {
-    background-color: rgba(10, 25, 47, 0.8) !important;
-    border-color: rgba(204, 214, 246, 0.1) !important;
-  }
-
-  /* Dark Theme - Pure dark background */
-  .dark body, .dark .reader-bg, .dark .main-bg {
-    background-color: #0a0a0a !important;
-    background-image: none !important;
-    color: #ffffff;
-  }
-
-  .dark .glass {
-    background-color: rgba(10, 10, 10, 0.8) !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
+  .glass {
+    background-color: var(--glass-bg) !important;
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border) !important;
   }
 }
 
@@ -68,4 +73,3 @@
 .book-shadow {
   box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -2px rgba(0, 0, 0, 0.05);
 }
-

@@ -1,351 +1,624 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Menu, User, Sparkles, TrendingUp, Bookmark, Compass, Home, BookOpen, Settings, Moon, Sun, ChevronLeft, X } from 'lucide-react';
-import { Book, Category } from './types';
-import { SAMPLE_BOOKS, CATEGORIES } from './constants';
-import BookCard from './components/BookCard';
-import Reader from './components/Reader';
-import Paywall from './components/Paywall';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { X, ChevronLeft, Bookmark, Share2, Play, Pause, BookOpen, List, Info, SkipBack, SkipForward, Volume2, Palette, Music, Loader2, MessageSquare, Send, Type, Sparkles } from 'lucide-react';
+import { Book, Theme, ReaderSettings } from '../types';
+import { useAudioPlayer } from '../hooks/useAudioPlayer';
+import { useTheme, AMBIENT_SOUNDS } from '../contexts/ThemeContext';
+import { generateBookNarration, askBookQuestion, expandBookContent } from '../services/geminiService';
 
-function MainApp() {
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-  const [activeCategory, setActiveCategory] = useState<Category | 'All'>('All');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'home' | 'library' | 'account'>('home');
-  const [showPaywall, setShowPaywall] = useState(false);
-  const { theme, setTheme } = useTheme();
-  const [showWelcome, setShowWelcome] = useState(false);
+interface ReaderProps {
+  book: Book;
+  onClose: () => void;
+}
 
-  useEffect(() => {
-    const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome');
-    if (!hasSeenWelcome) {
-      const timer = setTimeout(() => setShowWelcome(true), 1500);
-      sessionStorage.setItem('hasSeenWelcome', 'true');
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  const categoriesRef = useRef<HTMLDivElement>(null);
-
-  const scrollToCategories = () => {
-    categoriesRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const filteredBooks = SAMPLE_BOOKS.filter(book => {
-    const matchesCategory = activeCategory === 'All' || book.category === activeCategory;
-    const matchesSearch = book.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         book.author.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+export default function Reader({ book, onClose }: ReaderProps) {
+  const { isPlaying, progress, togglePlay, seek } = useAudioPlayer();
+  const { theme, setTheme, activeAmbient, ambientVolume, setAmbientVolume, playAmbient } = useTheme();
+  const [showSettings, setShowSettings] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [narrationUrl, setNarrationUrl] = useState<string | null>(null);
+  const [fullNarration, setFullNarration] = useState<string | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechProgress, setSpeechProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [totalTime, setTotalTime] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Typography Settings
+  const [settings, setSettings] = useState<ReaderSettings>(() => {
+    const saved = localStorage.getItem('reader-settings');
+    return saved ? JSON.parse(saved) : { fontSize: 18, lineHeight: 1.6, fontFamily: 'serif' };
   });
 
+  // AI Chat State
+  const [showChat, setShowChat] = useState(false);
+  const [chatQuestion, setChatQuestion] = useState('');
+  const [chatHistory, setChatHistory] = useState<{role: 'user' | 'ai', text: string}[]>([]);
+  const [isAsking, setIsAsking] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const readerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem('reader-settings', JSON.stringify(settings));
+  }, [settings]);
+
+  // Restore scroll progress
+  useEffect(() => {
+    const savedProgress = localStorage.getItem(`progress-${book.id}`);
+    if (savedProgress && readerRef.current) {
+      const scrollPos = parseFloat(savedProgress);
+      setTimeout(() => {
+        if (readerRef.current) {
+          readerRef.current.scrollTop = scrollPos;
+        }
+      }, 100);
+    }
+  }, [book.id]);
+
+  // Save scroll progress
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    localStorage.setItem(`progress-${book.id}`, scrollTop.toString());
+  };
+
+  useEffect(() => {
+    if (isSpeaking) {
+      timerRef.current = setInterval(() => {
+        setCurrentTime(prev => {
+          if (prev < totalTime) return prev + 1;
+          return prev;
+        });
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isSpeaking, totalTime]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleStartNarration = async () => {
+    const synth = window.speechSynthesis;
+
+    // If already speaking, handle pause/resume
+    if (isSpeaking) {
+      if (synth.paused) {
+        synth.resume();
+      } else {
+        synth.pause();
+      }
+      return;
+    }
+
+    // If we have the narration text already, just play it
+    if (fullNarration) {
+      playSpeech(fullNarration);
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const expandedText = await expandBookContent(book.title, book.author, book.summary, book.keyInsights);
+      setIsGenerating(false);
+      
+      if (expandedText) {
+        const wordCount = expandedText.split(/\s+/).length;
+        const calculatedTotalTime = Math.round((wordCount / 150) * 60);
+        console.log("Narration generated. Word count:", wordCount, "Estimated time:", calculatedTotalTime, "seconds");
+        console.log("Text preview:", expandedText.substring(0, 200) + "...");
+        
+        setTotalTime(calculatedTotalTime);
+        setCurrentTime(0);
+        setFullNarration(expandedText);
+        playSpeech(expandedText);
+      } else {
+        alert("Could not generate expanded narration. Playing standard summary instead.");
+        const shortText = `${book.title} by ${book.author}. ${book.summary}`;
+        setFullNarration(shortText);
+        playSpeech(shortText);
+      }
+    } catch (error) {
+      console.error("Error in narration flow:", error);
+      setIsGenerating(false);
+    }
+  };
+
+  const playSpeech = (text: string) => {
+    const synth = window.speechSynthesis;
+    synth.cancel(); // Stop any current speech
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.85;
+    utterance.lang = 'en-US';
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setSpeechProgress(0);
+      setCurrentTime(0);
+    };
+    utterance.onpause = () => setIsSpeaking(false);
+    utterance.onresume = () => setIsSpeaking(true);
+    
+    utterance.onboundary = (event) => {
+      if (event.name === 'word') {
+        const progress = (event.charIndex / text.length) * 100;
+        setSpeechProgress(progress);
+      }
+    };
+
+    // Wait for voices then select best
+    const loadVoices = () => {
+      const voices = synth.getVoices();
+      const best = 
+        voices.find(v => v.name === 'Google US English') ||
+        voices.find(v => v.name.includes('Samantha')) ||
+        voices.find(v => v.lang === 'en-US' && !v.localService) ||
+        voices.find(v => v.lang.startsWith('en'));
+      
+      if (best) {
+        console.log("Selected voice:", best.name);
+        utterance.voice = best;
+      }
+      synth.speak(utterance);
+    };
+
+    if (synth.getVoices().length > 0) {
+      loadVoices();
+    } else {
+      synth.onvoiceschanged = loadVoices;
+    }
+  };
+
+  const handleAskQuestion = async () => {
+    if (!chatQuestion.trim() || isAsking) return;
+
+    const question = chatQuestion;
+    setChatQuestion('');
+    setChatHistory(prev => [...prev, { role: 'user', text: question }]);
+    setIsAsking(true);
+
+    const answer = await askBookQuestion(book.title, book.summary, question);
+    setIsAsking(false);
+
+    if (answer) {
+      setChatHistory(prev => [...prev, { role: 'ai', text: answer }]);
+    }
+  };
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatHistory]);
+
+  const handleShare = async () => {
+    const shareData = {
+      title: `House of Books: ${book.title}`,
+      text: `Check out these key insights from "${book.title}" by ${book.author} on House of Books!`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Link copied to clipboard!');
+      }
+    } catch (err) {
+      console.error('Error sharing:', err);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#FDFCFB] dark:bg-stone-950 main-bg transition-colors duration-300">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-40 glass dark:bg-stone-900/80 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <h1 className="font-serif text-2xl font-bold tracking-tight flex items-center gap-2 dark:text-white">
-              <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white">
-                <Bookmark size={18} fill="currentColor" />
-              </div>
-              House of Books
-            </h1>
-            
-            <div className="hidden md:flex items-center gap-6 text-sm font-medium text-stone-500 dark:text-stone-400">
-              <button 
-                onClick={() => setActiveTab('home')}
-                className={activeTab === 'home' ? 'text-emerald-600' : 'hover:text-stone-900 dark:hover:text-white transition-colors'}
-              >
-                Explore
-              </button>
-              <button 
-                onClick={() => setActiveTab('library')}
-                className={activeTab === 'library' ? 'text-emerald-600' : 'hover:text-stone-900 dark:hover:text-white transition-colors'}
-              >
-                My Library
-              </button>
-              <button 
-                onClick={() => setShowPaywall(true)}
-                className="hover:text-stone-900 dark:hover:text-white transition-colors flex items-center gap-1"
-              >
-                <Sparkles size={14} className="text-amber-500" />
-                Premium
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="relative hidden sm:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
-              <input 
-                type="text"
-                placeholder="Search books, authors..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-stone-100 dark:bg-stone-800 border-none rounded-full text-sm focus:ring-2 focus:ring-emerald-500/20 w-64 transition-all dark:text-white"
-              />
-            </div>
-            <button 
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-full transition-colors text-stone-500 dark:text-stone-400"
-            >
-              {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-            </button>
-            <button 
-              onClick={() => setActiveTab('account')}
-              className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-full transition-colors text-stone-500 dark:text-stone-400"
-            >
-              <User size={20} />
-            </button>
-          </div>
+    <motion.div
+      ref={readerRef}
+      onScroll={handleScroll}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 reader-bg overflow-y-auto"
+    >
+      {/* Header */}
+      <header className="sticky top-0 z-40 glass px-6 py-4 flex items-center justify-between">
+        <button 
+          onClick={onClose}
+          className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-full transition-colors"
+        >
+          <ChevronLeft size={24} className="dark:text-white nature:text-emerald-100 classic:text-amber-100" />
+        </button>
+        
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setShowSettings(!showSettings)}
+            className={`p-2 rounded-full transition-colors ${showSettings ? 'bg-emerald-600 text-white' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
+          >
+            <Palette size={20} className={showSettings ? 'text-white' : 'dark:text-white nature:text-emerald-100 classic:text-amber-100'} />
+          </button>
+          <button className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-full transition-colors">
+            <Bookmark size={20} className="dark:text-white nature:text-emerald-100 classic:text-amber-100" />
+          </button>
+          <button 
+            onClick={handleShare}
+            className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-full transition-colors"
+          >
+            <Share2 size={20} className="dark:text-white nature:text-emerald-100 classic:text-amber-100" />
+          </button>
         </div>
-      </nav>
+      </header>
 
-      <main className="flex-grow pb-24 md:pb-0">
-        {activeTab === 'home' && (
-          <>
-            {/* Hero Section */}
-            <section className="px-6 py-16 md:py-24 bg-stone-50 dark:bg-stone-900/30 border-b border-stone-200 dark:border-stone-800">
-              <div className="max-w-7xl mx-auto">
-                <div className="max-w-2xl">
-                  <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest mb-4">
-                    <Sparkles size={14} />
-                    Daily Pick for You
-                  </div>
-                  <h2 className="font-serif text-5xl md:text-6xl leading-tight mb-6 dark:text-white">
-                    Understand the world's best ideas in <span className="italic text-emerald-600">15 minutes</span>.
-                  </h2>
-                  <p className="text-xl text-stone-500 dark:text-stone-400 mb-10 leading-relaxed">
-                    Get the key insights from non-fiction bestsellers. Read or listen to summaries that fit your busy schedule.
-                  </p>
-                  <div className="flex flex-wrap gap-4">
-                    <button 
-                      onClick={() => setShowPaywall(true)}
-                      className="bg-stone-900 dark:bg-emerald-600 text-white px-8 py-4 rounded-full font-semibold hover:bg-stone-800 dark:hover:bg-emerald-700 transition-all shadow-lg shadow-stone-900/10"
-                    >
-                      Start Free Trial
-                    </button>
-                    <button 
-                      onClick={scrollToCategories}
-                      className="bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 px-8 py-4 rounded-full font-semibold hover:bg-stone-50 dark:hover:bg-stone-700 transition-all dark:text-white"
-                    >
-                      Browse Categories
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Categories & Content */}
-            <section ref={categoriesRef} className="px-6 py-16 max-w-7xl mx-auto">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-12">
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-                  <button 
-                    onClick={() => setActiveCategory('All')}
-                    className={`px-6 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
-                      activeCategory === 'All' 
-                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' 
-                      : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700'
-                    }`}
-                  >
-                    All
-                  </button>
-                  {CATEGORIES.map(cat => (
-                    <button 
-                      key={cat}
-                      onClick={() => setActiveCategory(cat)}
-                      className={`px-6 py-2 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
-                        activeCategory === cat 
-                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' 
-                        : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700'
+      {/* Settings Panel */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -20, opacity: 0 }}
+            className="sticky top-[72px] z-30 glass p-6 border-b border-stone-200 dark:border-stone-800 shadow-xl"
+          >
+            <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Themes */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-widest mb-4 text-stone-400 flex items-center gap-2">
+                  <Palette size={14} />
+                  Themes
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {(['light', 'dark', 'classic', 'nature', 'beach'] as Theme[]).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setTheme(t)}
+                      className={`px-4 py-2 rounded-full text-xs font-bold capitalize transition-all ${
+                        theme === t ? 'bg-emerald-600 text-white' : 'bg-stone-100 dark:bg-stone-800 text-stone-500'
                       }`}
                     >
-                      {cat}
+                      {t}
                     </button>
                   ))}
                 </div>
-
-                <div className="flex items-center gap-6 text-sm font-medium text-stone-400">
-                  <div className="flex items-center gap-2 text-stone-900 dark:text-white">
-                    <TrendingUp size={16} />
-                    Trending
-                  </div>
-                  <div className="flex items-center gap-2 hover:text-stone-900 dark:hover:text-white cursor-pointer transition-colors">
-                    <Compass size={16} />
-                    Newest
-                  </div>
-                </div>
               </div>
 
-              {/* Book Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
-                <AnimatePresence mode="popLayout">
-                  {filteredBooks.map(book => (
-                    <BookCard 
-                      key={book.id} 
-                      book={book} 
-                      onClick={(b) => setSelectedBook(b)} 
+              {/* Typography */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-widest mb-4 text-stone-400 flex items-center gap-2">
+                  <Type size={14} />
+                  Typography
+                </h4>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs font-bold text-stone-500 w-12">Size</span>
+                    <input 
+                      type="range" min="14" max="24" step="1" 
+                      value={settings.fontSize}
+                      onChange={(e) => setSettings({...settings, fontSize: parseInt(e.target.value)})}
+                      className="flex-grow accent-emerald-600"
                     />
+                    <span className="text-xs font-bold text-stone-500">{settings.fontSize}px</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs font-bold text-stone-500 w-12">Height</span>
+                    <input 
+                      type="range" min="1.2" max="2.0" step="0.1" 
+                      value={settings.lineHeight}
+                      onChange={(e) => setSettings({...settings, lineHeight: parseFloat(e.target.value)})}
+                      className="flex-grow accent-emerald-600"
+                    />
+                    <span className="text-xs font-bold text-stone-500">{settings.lineHeight}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setSettings({...settings, fontFamily: 'serif'})}
+                      className={`flex-grow py-2 rounded-lg text-xs font-bold border ${settings.fontFamily === 'serif' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-stone-200 dark:border-stone-700 text-stone-500'}`}
+                    >
+                      Serif
+                    </button>
+                    <button 
+                      onClick={() => setSettings({...settings, fontFamily: 'sans'})}
+                      className={`flex-grow py-2 rounded-lg text-xs font-bold border ${settings.fontFamily === 'sans' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-stone-200 dark:border-stone-700 text-stone-500'}`}
+                    >
+                      Sans
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ambient */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-widest mb-4 text-stone-400 flex items-center gap-2">
+                  <Music size={14} />
+                  Ambient
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {AMBIENT_SOUNDS.map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => playAmbient(s.id)}
+                      className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 ${
+                        activeAmbient === s.id ? 'bg-amber-600 text-white' : 'bg-stone-100 dark:bg-stone-800 text-stone-500'
+                      }`}
+                    >
+                      {s.name}
+                      {activeAmbient === s.id && s.id !== 'none' && (
+                        <motion.div
+                          animate={{ scale: [1, 1.2, 1] }}
+                          transition={{ repeat: Infinity, duration: 1 }}
+                          className="w-1.5 h-1.5 rounded-full bg-white"
+                        />
+                      )}
+                    </button>
                   ))}
-                </AnimatePresence>
-              </div>
-
-              {filteredBooks.length === 0 && (
-                <div className="py-24 text-center">
-                  <p className="text-stone-400 text-lg">No books found matching your criteria.</p>
                 </div>
-              )}
-            </section>
-          </>
-        )}
-
-        {activeTab === 'library' && (
-          <section className="px-6 py-16 max-w-7xl mx-auto">
-            <h2 className="font-serif text-4xl mb-8 dark:text-white">My Library</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
-              {SAMPLE_BOOKS.slice(0, 2).map(book => (
-                <BookCard 
-                  key={book.id} 
-                  book={book} 
-                  onClick={(b) => setSelectedBook(b)} 
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {activeTab === 'account' && (
-          <section className="px-6 py-16 max-w-3xl mx-auto">
-            <h2 className="font-serif text-4xl mb-12 dark:text-white">Account</h2>
-            <div className="space-y-6">
-              <div className="p-6 bg-stone-50 dark:bg-stone-900 rounded-2xl flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center text-emerald-600">
-                    <User size={24} />
+                {activeAmbient !== 'none' && (
+                  <div className="mt-4 flex items-center gap-3">
+                    <Volume2 size={14} className="text-stone-400" />
+                    <input 
+                      type="range" 
+                      min="0" max="1" step="0.01" 
+                      value={ambientVolume}
+                      onChange={(e) => setAmbientVolume(parseFloat(e.target.value))}
+                      className="flex-grow accent-amber-600"
+                    />
                   </div>
-                  <div>
-                    <p className="font-bold dark:text-white">User Name</p>
-                    <p className="text-sm text-stone-500">user@example.com</p>
-                  </div>
-                </div>
-                <button className="text-sm text-emerald-600 font-semibold">Edit</button>
-              </div>
-
-              <div className="space-y-2">
-                <button 
-                  onClick={() => setShowPaywall(true)}
-                  className="w-full p-4 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <Sparkles size={20} />
-                    Upgrade to Premium
-                  </div>
-                  <ChevronLeft size={20} className="rotate-180" />
-                </button>
-                <button className="w-full p-4 bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-white rounded-xl font-semibold flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Settings size={20} />
-                    Settings
-                  </div>
-                  <ChevronLeft size={20} className="rotate-180" />
-                </button>
+                )}
               </div>
             </div>
-          </section>
-        )}
-      </main>
-
-      {/* Mobile Tab Bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 glass dark:bg-stone-900/90 px-6 py-4 flex justify-between items-center border-t border-stone-200 dark:border-stone-800 z-40">
-        <button 
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center gap-1 ${activeTab === 'home' ? 'text-emerald-600' : 'text-stone-400'}`}
-        >
-          <Home size={20} />
-          <span className="text-[10px] font-bold uppercase">Explore</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('library')}
-          className={`flex flex-col items-center gap-1 ${activeTab === 'library' ? 'text-emerald-600' : 'text-stone-400'}`}
-        >
-          <BookOpen size={20} />
-          <span className="text-[10px] font-bold uppercase">Library</span>
-        </button>
-        <button 
-          onClick={() => setActiveTab('account')}
-          className={`flex flex-col items-center gap-1 ${activeTab === 'account' ? 'text-emerald-600' : 'text-stone-400'}`}
-        >
-          <User size={20} />
-          <span className="text-[10px] font-bold uppercase">Account</span>
-        </button>
-      </div>
-
-      {/* Footer (Desktop only) */}
-      <footer className="hidden md:block bg-stone-900 text-stone-400 py-16 px-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
-          <div className="col-span-1 md:col-span-2">
-            <h2 className="font-serif text-2xl text-white font-bold mb-6">House of Books</h2>
-            <p className="max-w-sm mb-8">
-              Empowering curious minds with the world's best ideas, summarized for your convenience.
-            </p>
-          </div>
-          
-          <div>
-            <h4 className="text-white font-semibold mb-6">Company</h4>
-            <ul className="space-y-4 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-white font-semibold mb-6">Support</h4>
-            <ul className="space-y-4 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-            </ul>
-          </div>
-        </div>
-      </footer>
-
-      {/* Overlays */}
-      <AnimatePresence>
-        {selectedBook && (
-          <Reader 
-            book={selectedBook} 
-            onClose={() => setSelectedBook(null)} 
-          />
-        )}
-        {showPaywall && (
-          <Paywall onClose={() => setShowPaywall(false)} />
-        )}
-        {showWelcome && (
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-[100] bg-emerald-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 font-bold"
-          >
-            <Sparkles size={18} />
-            Welcome to House of Books!
-            <button 
-              onClick={() => setShowWelcome(false)}
-              className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
-            >
-              <X size={16} />
-            </button>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
 
-export default function App() {
-  return (
-    <ThemeProvider>
-      <MainApp />
-    </ThemeProvider>
+      <div className="max-w-3xl mx-auto px-6 py-12">
+        {/* Book Info */}
+        <div className="flex flex-col md:flex-row gap-8 mb-16">
+          <div className="w-full md:w-1/3 shrink-0">
+            <motion.img
+              layoutId={`book-${book.id}`}
+              src={book.coverUrl}
+              alt={book.title}
+              className="w-full aspect-[2/3] object-cover rounded-xl book-shadow"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          
+          <div className="flex flex-col justify-center">
+            <span className="text-xs font-bold text-emerald-600 nature:text-emerald-400 uppercase tracking-widest mb-2">
+              {book.category}
+            </span>
+            <h1 className="font-serif text-4xl md:text-5xl leading-tight mb-4 dark:text-white nature:text-emerald-50 classic:text-amber-50">
+              {book.title}
+            </h1>
+            <p className="text-xl text-stone-500 italic mb-6 nature:text-stone-400 classic:text-stone-400">
+              by {book.author}
+            </p>
+            
+            <div className="flex flex-wrap gap-4 items-center">
+              <button 
+                disabled={isGenerating}
+                onClick={handleStartNarration}
+                className="bg-emerald-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {isGenerating ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (isSpeaking || isPlaying) ? (
+                  <Pause size={18} fill="currentColor" />
+                ) : (
+                  <Play size={18} fill="currentColor" />
+                )}
+                {isGenerating ? 'Generating Narration...' : (isSpeaking || isPlaying) ? 'Pause Narration' : 'Listen to Summary'}
+              </button>
+              <div className="text-sm text-stone-400 font-medium">
+                {book.readTime} min read • 8 key insights
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Audio Player Bar (Floating when playing) */}
+        <AnimatePresence>
+          {(isPlaying || isSpeaking) && (
+            <motion.div 
+              initial={{ y: 100 }}
+              animate={{ y: 0 }}
+              exit={{ y: 100 }}
+              className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl glass rounded-2xl p-4 shadow-2xl z-50"
+            >
+              <div className="flex items-center gap-4">
+                <img src={book.coverUrl} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                <div className="flex-grow">
+                  <div className="flex justify-between items-center mb-1">
+                    <p className="text-xs font-bold dark:text-white nature:text-emerald-50 truncate max-w-[150px]">{book.title}</p>
+                    <div className="flex items-center gap-4">
+                      <span className="text-[10px] font-mono text-stone-400">
+                        {isSpeaking ? `${formatTime(currentTime)} / ${formatTime(totalTime)}` : '0:00 / 0:00'}
+                      </span>
+                      <SkipBack size={16} className="text-stone-400 cursor-pointer hover:text-stone-600" />
+                      <button onClick={() => isSpeaking ? handleStartNarration() : togglePlay()}>
+                        {(isPlaying || isSpeaking) ? <Pause size={20} className="dark:text-white nature:text-emerald-50" /> : <Play size={20} className="dark:text-white nature:text-emerald-50" />}
+                      </button>
+                      <SkipForward size={16} className="text-stone-400 cursor-pointer hover:text-stone-600" />
+                    </div>
+                  </div>
+                  <div className="relative h-1 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden cursor-pointer" onClick={(e) => {
+                    if (isSpeaking) return; // Speech synthesis doesn't support easy seeking this way
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    seek((x / rect.width) * 100);
+                  }}>
+                    <div 
+                      className="absolute top-0 left-0 h-full bg-emerald-600 transition-all duration-100"
+                      style={{ width: `${isSpeaking ? speechProgress : progress}%` }}
+                    />
+                  </div>
+                </div>
+                <Volume2 size={18} className="text-stone-400 hidden sm:block" />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Content Tabs */}
+        <div className="border-b border-stone-200 dark:border-stone-800 mb-12 flex gap-8">
+          <button className="pb-4 border-b-2 border-emerald-600 text-emerald-600 font-semibold flex items-center gap-2">
+            <BookOpen size={18} />
+            Summary
+          </button>
+          <button className="pb-4 border-b-2 border-transparent text-stone-400 hover:text-stone-600 transition-colors flex items-center gap-2">
+            <List size={18} />
+            Key Insights
+          </button>
+          <button className="pb-4 border-b-2 border-transparent text-stone-400 hover:text-stone-600 transition-colors flex items-center gap-2">
+            <Info size={18} />
+            About Author
+          </button>
+        </div>
+
+        {/* Text Content */}
+        <article 
+          className={`prose prose-stone dark:prose-invert nature:prose-emerald classic:prose-amber max-w-none ${settings.fontFamily === 'serif' ? 'font-serif' : 'font-sans'}`}
+          style={{ 
+            fontSize: `${settings.fontSize}px`,
+            lineHeight: settings.lineHeight
+          }}
+        >
+          <h2 className="font-serif text-3xl mb-6 dark:text-white nature:text-emerald-50 classic:text-amber-50">Introduction</h2>
+          <p className="text-stone-700 dark:text-stone-300 nature:text-emerald-100/80 classic:text-amber-100/80 leading-relaxed mb-8">
+            {book.summary}
+          </p>
+          
+          <h2 className="font-serif text-3xl mb-6 dark:text-white nature:text-emerald-50 classic:text-amber-50">Key Insights</h2>
+          <div className="space-y-8">
+            {book.keyInsights.map((insight, index) => (
+              <div key={index} className="flex gap-6">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 nature:bg-emerald-900/40 text-emerald-600 nature:text-emerald-400 flex items-center justify-center font-bold text-lg">
+                  {index + 1}
+                </div>
+                <p className="text-stone-700 dark:text-stone-300 nature:text-emerald-100/80 classic:text-amber-100/80 leading-relaxed pt-1">
+                  {insight}
+                </p>
+              </div>
+            ))}
+          </div>
+        </article>
+      </div>
+
+      {/* AI Chat Button */}
+      <button 
+        onClick={() => setShowChat(true)}
+        className="fixed bottom-8 right-8 w-14 h-14 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-emerald-700 transition-all z-40 group"
+      >
+        <MessageSquare size={24} />
+        <span className="absolute right-full mr-4 bg-stone-900 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+          Ask Gemini about this book
+        </span>
+      </button>
+
+      {/* AI Chat Sidebar */}
+      <AnimatePresence>
+        {showChat && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowChat(false)}
+              className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[60]"
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-stone-900 shadow-2xl z-[70] flex flex-col"
+            >
+              <div className="p-6 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center text-emerald-600">
+                    <Sparkles size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold dark:text-white">Book Assistant</h3>
+                    <p className="text-xs text-stone-500">Powered by Gemini</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowChat(false)}
+                  className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-full transition-colors"
+                >
+                  <X size={20} className="text-stone-400" />
+                </button>
+              </div>
+
+              <div className="flex-grow overflow-y-auto p-6 space-y-6">
+                {chatHistory.length === 0 && (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-stone-50 dark:bg-stone-800 rounded-full flex items-center justify-center mx-auto mb-4 text-stone-400">
+                      <MessageSquare size={32} />
+                    </div>
+                    <p className="text-stone-500 text-sm">Ask anything about "{book.title}"</p>
+                    <div className="mt-6 flex flex-wrap justify-center gap-2">
+                      {['What is the main takeaway?', 'Explain the 3rd insight', 'How can I apply this?'].map(q => (
+                        <button 
+                          key={q}
+                          onClick={() => {
+                            setChatQuestion(q);
+                            // Auto-send if we want, or just set it
+                          }}
+                          className="text-xs bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 px-3 py-1.5 rounded-full text-stone-600 dark:text-stone-400 transition-colors"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {chatHistory.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] p-4 rounded-2xl text-sm ${
+                      msg.role === 'user' 
+                      ? 'bg-emerald-600 text-white rounded-tr-none' 
+                      : 'bg-stone-100 dark:bg-stone-800 text-stone-800 dark:text-stone-200 rounded-tl-none'
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+                {isAsking && (
+                  <div className="flex justify-start">
+                    <div className="bg-stone-100 dark:bg-stone-800 p-4 rounded-2xl rounded-tl-none">
+                      <Loader2 size={18} className="animate-spin text-emerald-600" />
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              <div className="p-6 border-t border-stone-200 dark:border-stone-800">
+                <div className="relative">
+                  <input 
+                    type="text"
+                    placeholder="Ask a question..."
+                    value={chatQuestion}
+                    onChange={(e) => setChatQuestion(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAskQuestion()}
+                    className="w-full pl-4 pr-12 py-3 bg-stone-100 dark:bg-stone-800 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 dark:text-white"
+                  />
+                  <button 
+                    onClick={handleAskQuestion}
+                    disabled={!chatQuestion.trim() || isAsking}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                  >
+                    <Send size={18} />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
