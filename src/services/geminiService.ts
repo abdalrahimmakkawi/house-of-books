@@ -5,7 +5,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 export async function generateBookNarration(text: string): Promise<string | null> {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [{ parts: [{ text: `Read this book summary in a calm, professional, and engaging voice: ${text}` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
@@ -88,7 +88,7 @@ export async function generateBookNarration(text: string): Promise<string | null
 export async function askBookQuestion(bookTitle: string, bookSummary: string, question: string): Promise<string | null> {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [{ 
         parts: [{ 
           text: `You are an expert on the book "${bookTitle}". 
@@ -102,7 +102,7 @@ export async function askBookQuestion(bookTitle: string, bookSummary: string, qu
       }],
     });
 
-    return response.text || "I'm sorry, I couldn't generate an answer right now.";
+    return response.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't generate an answer right now.";
   } catch (error) {
     console.error("Error asking book question:", error);
     return null;
@@ -112,7 +112,7 @@ export async function askBookQuestion(bookTitle: string, bookSummary: string, qu
 export async function expandBookContent(bookTitle: string, bookAuthor: string, bookSummary: string, keyInsights: string[]): Promise<string | null> {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [{ 
         parts: [{ 
           text: `You are a professional audiobook narrator. Your task is to expand the following book summary and key insights into a comprehensive, detailed narration of at least 2500 words.
@@ -126,7 +126,7 @@ export async function expandBookContent(bookTitle: string, bookAuthor: string, b
           1. Start with a detailed introduction to the book and its author (approx 300 words).
           2. For EACH key insight, write a very detailed section of at least 300 words. Explain the core concept, provide real-world examples, discuss why it matters, and how it can be applied.
           3. Use a conversational, engaging, and insightful tone.
-          4. Conclude with a summary of the main takeaways and a final thought (approx 200 words).
+          4. Conclude with a summary of main takeaways and a final thought (approx 200 words).
           5. Ensure the total word count is at least 2500 words. Be verbose and thorough.
           
           Do not use markdown formatting like bold or headers, just plain text suitable for text-to-speech.` 
@@ -134,7 +134,7 @@ export async function expandBookContent(bookTitle: string, bookAuthor: string, b
       }],
     });
 
-    return response.text || null;
+    return response.candidates?.[0]?.content?.parts?.[0]?.text || null;
   } catch (error) {
     console.error("Error expanding book content:", error);
     return null;
