@@ -106,6 +106,49 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const audio = audioRef.current;
     const sound = AMBIENT_SOUNDS.find(s => s.id === id);
 
+    // Define loadNewAudio BEFORE using it
+    const loadNewAudio = () => {
+      if (!sound || !sound.url) return;
+      
+      audio.src = sound.url;
+      audio.load();
+      
+      audio.onerror = () => {
+        console.error('Error loading audio:', sound.url);
+      };
+      
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log("Now playing:", sound.name);
+            // Fade in
+            audio.volume = 0;
+            const targetVol = ambientVolume;
+            const steps = 30;
+            const stepTime = 500 / steps;
+            const volumeStep = targetVol / steps;
+            let step = 0;
+
+            if (fadeIntervalRef.current) {
+              clearInterval(fadeIntervalRef.current);
+            }
+
+            fadeIntervalRef.current = setInterval(() => {
+              step++;
+              audio.volume = Math.min(targetVol, volumeStep * step);
+              if (step >= steps) {
+                audio.volume = targetVol;
+                clearInterval(fadeIntervalRef.current!);
+              }
+            }, stepTime);
+          })
+          .catch(err => {
+            console.error('Error playing audio:', err);
+          });
+      }
+    };
+
     if (sound && sound.url) {
       console.log("Switching ambient to:", sound.name, "URL:", sound.url);
       
@@ -143,46 +186,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       } else {
         loadNewAudio();
       }
-
-      const loadNewAudio = () => {
-        audio.src = sound.url;
-        audio.load();
-        
-        audio.onerror = () => {
-          console.error('Error loading audio:', sound.url);
-        };
-        
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              console.log("Now playing:", sound.name);
-              // Fade in
-              audio.volume = 0;
-              const targetVol = ambientVolume;
-              const steps = 30;
-              const stepTime = 500 / steps;
-              const volumeStep = targetVol / steps;
-              let step = 0;
-
-              if (fadeIntervalRef.current) {
-                clearInterval(fadeIntervalRef.current);
-              }
-
-              fadeIntervalRef.current = setInterval(() => {
-                step++;
-                audio.volume = Math.min(targetVol, volumeStep * step);
-                if (step >= steps) {
-                  audio.volume = targetVol;
-                  clearInterval(fadeIntervalRef.current!);
-                }
-              }, stepTime);
-            })
-            .catch(err => {
-              console.error('Error playing audio:', err);
-            });
-        }
-      };
     } else if (id === 'none') {
       // Stop playback with fade out
       if (!audio.paused && audio.volume > 0) {
