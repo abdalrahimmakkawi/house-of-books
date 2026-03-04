@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ChevronLeft, Bookmark, Share2, Play, Pause, BookOpen, List, Info, SkipBack, SkipForward, Volume2, Palette, Music, Loader2, MessageSquare, Send, Type, Sparkles } from 'lucide-react';
-import { Book, Theme, ReaderSettings } from '../types';
-import { useAudioPlayer } from '../hooks/useAudioPlayer';
-import { useTheme, AMBIENT_SOUNDS } from '../contexts/ThemeContext';
-import { generateBookNarration, askBookQuestion, expandBookContent } from '../services/geminiService';
+import { Book, Theme, ReaderSettings } from "./types";
+import { useAudioPlayer } from "./hooks/useAudioPlayer";
+import { useTheme, AMBIENT_SOUNDS } from "./contexts/ThemeContext";
+import { generateBookNarration, askBookQuestion, expandBookContent } from "./services/geminiService";
 
 interface ReaderProps {
   book: Book;
