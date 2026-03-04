@@ -4,9 +4,10 @@ import BookCard from './components/BookCard';
 import Reader from './App';
 import { useBooks } from './hooks/useBooks';
 import { useTheme } from './contexts/ThemeContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { Loader2 } from 'lucide-react';
 
-export default function App() {
+function MainApp() {
   const { books, loading } = useBooks();
   const { theme } = useTheme();
   const [selectedBook, setSelectedBook] = React.useState<any>(null);
@@ -62,5 +63,13 @@ export default function App() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <MainApp />
+    </ThemeProvider>
   );
 }
