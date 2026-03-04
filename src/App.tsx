@@ -5,6 +5,7 @@ import { Book, Theme, ReaderSettings } from "./types";
 import { useAudioPlayer } from "./hooks/useAudioPlayer";
 import { useTheme, AMBIENT_SOUNDS } from "./contexts/ThemeContext";
 import { generateBookNarration, askBookQuestion, expandBookContent } from "./services/geminiService";
+import { useBooks } from "./hooks/useBooks";
 
 interface ReaderProps {
   book: Book;
