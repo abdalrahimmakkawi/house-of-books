@@ -5,7 +5,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 export async function generateBookNarration(text: string): Promise<string | null> {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: [{ parts: [{ text: `Read this book summary in a calm, professional, and engaging voice: ${text}` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
@@ -88,7 +88,7 @@ export async function generateBookNarration(text: string): Promise<string | null
 export async function askBookQuestion(bookTitle: string, bookSummary: string, question: string): Promise<string | null> {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: [{ 
         parts: [{ 
           text: `You are an expert on the book "${bookTitle}". 
@@ -112,7 +112,7 @@ export async function askBookQuestion(bookTitle: string, bookSummary: string, qu
 export async function expandBookContent(bookTitle: string, bookAuthor: string, bookSummary: string, keyInsights: string[]): Promise<string | null> {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       contents: [{ 
         parts: [{ 
           text: `You are a professional audiobook narrator. Your task is to expand the following book summary and key insights into a comprehensive, detailed narration of at least 2500 words.
