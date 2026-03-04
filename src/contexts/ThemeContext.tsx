@@ -9,14 +9,6 @@ export const AMBIENT_SOUNDS: AmbientSound[] = [
   { id: 'rain', name: 'Rainy Day', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3', icon: 'CloudRain' },
 ];
 
-const THEME_AUDIO_MAP: Record<Theme, string> = {
-  classic: 'library',
-  nature: 'forest',
-  beach: 'beach',
-  dark: 'none',
-  light: 'none',
-};
-
 interface ThemeContextType {
   theme: Theme;
   setTheme: (theme: Theme) => void;
@@ -55,10 +47,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [ambientVolume]);
 
   useEffect(() => {
-    const defaultAudio = THEME_AUDIO_MAP[theme];
-    if (defaultAudio !== 'none') {
-      playAmbient(defaultAudio);
-    }
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark', 'classic', 'nature', 'beach');
+    root.classList.add(theme);
+    localStorage.setItem('theme', theme);
   }, [theme]);
 
   const playAmbient = (id: string) => {
