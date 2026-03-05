@@ -6,6 +6,7 @@ import { useAudioPlayer } from "./hooks/useAudioPlayer";
 import { useTheme, AMBIENT_SOUNDS } from "./contexts/ThemeContext";
 import { generateBookNarration, askBookQuestion, expandBookContent } from "./services/geminiService";
 import { useBooks } from "./hooks/useBooks";
+import Paywall from "./components/Paywall";
 
 interface ReaderProps {
   book: Book;
@@ -16,6 +17,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
   const { isPlaying, progress, togglePlay, seek } = useAudioPlayer();
   const { theme, setTheme, activeAmbient, ambientVolume, setAmbientVolume, playAmbient } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [narrationUrl, setNarrationUrl] = useState<string | null>(null);
   const [fullNarration, setFullNarration] = useState<string | null>(null);
@@ -24,6 +26,8 @@ export default function Reader({ book, onClose }: ReaderProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [totalTime, setTotalTime] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const isPremium = localStorage.getItem('isPremium') === 'true';
   
   // Typography Settings
   const [settings, setSettings] = useState<ReaderSettings>(() => {
@@ -90,6 +94,11 @@ export default function Reader({ book, onClose }: ReaderProps) {
   };
 
   const handleStartNarration = async () => {
+    if (!isPremium) {
+      setShowPaywall(true);
+      return;
+    }
+
     const synth = window.speechSynthesis;
 
     // If already speaking, handle pause/resume
@@ -140,7 +149,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
     synth.cancel(); // Stop any current speech
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.85;
+    utterance.rate = 0.80;
     utterance.lang = 'en-US';
 
     utterance.onstart = () => setIsSpeaking(true);
@@ -184,6 +193,11 @@ export default function Reader({ book, onClose }: ReaderProps) {
 
   const handleAskQuestion = async () => {
     if (!chatQuestion.trim() || isAsking) return;
+    
+    if (!isPremium) {
+      setShowPaywall(true);
+      return;
+    }
 
     const question = chatQuestion;
     setChatQuestion('');
@@ -691,6 +705,11 @@ export default function Reader({ book, onClose }: ReaderProps) {
           </>
         )}
       </AnimatePresence>
+
+      {/* Paywall Modal */}
+      {showPaywall && (
+        <Paywall onClose={() => setShowPaywall(false)} />
+      )}
     </motion.div>
   );
 }

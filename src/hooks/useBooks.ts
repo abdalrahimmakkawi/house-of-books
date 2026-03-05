@@ -18,7 +18,8 @@ export function useBooks() {
           return;
         }
 
-        console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+        // Check if user is premium
+        const isPremium = localStorage.getItem('isPremium') === 'true';
 
         // Step 3: Original query
         const { data, error } = await supabase
@@ -31,7 +32,7 @@ export function useBooks() {
           console.log('Falling back to sample books');
           setBooks(SAMPLE_BOOKS);
         } else if (data) {
-          const mapped = data.map(b => ({
+          const mapped = data.map((b, index) => ({
             id: b.id,
             title: b.title,
             author: b.author,
@@ -41,8 +42,12 @@ export function useBooks() {
             summary: b.summaries?.[0]?.short_summary || '',
             longSummary: b.summaries?.[0]?.long_summary || '',
             keyInsights: b.summaries?.[0]?.key_insights || [],
+            isPremium: index >= 44, // Books 45+ are premium
           }));
-          setBooks(mapped);
+
+          // Filter books based on premium status
+          const filteredBooks = isPremium ? mapped : mapped.slice(0, 44);
+          setBooks(filteredBooks);
         }
       } catch (error) {
         console.error('Error in fetchBooks:', error);

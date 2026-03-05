@@ -123,21 +123,20 @@ export async function expandBookContent(bookTitle: string, bookAuthor: string, b
       model: "gemini-2.0-flash",
       contents: [{ 
         parts: [{ 
-          text: `You are a professional audiobook narrator. Your task is to expand the following book summary and key insights into a comprehensive, detailed narration of at least 2500 words.
-          
-          Book: "${bookTitle}" by ${bookAuthor}
-          Summary: ${bookSummary}
-          Key Insights:
-          ${keyInsights.map((insight, i) => `${i + 1}. ${insight}`).join('\n')}
-          
-          Instructions:
-          1. Start with a detailed introduction to the book and its author (approx 300 words).
-          2. For EACH key insight, write a very detailed section of at least 300 words. Explain the core concept, provide real-world examples, discuss why it matters, and how it can be applied.
-          3. Use a conversational, engaging, and insightful tone.
-          4. Conclude with a summary of main takeaways and a final thought (approx 200 words).
-          5. Ensure the total word count is at least 2500 words. Be verbose and thorough.
-          
-          Do not use markdown formatting like bold or headers, just plain text suitable for text-to-speech.` 
+          text: `You are a professional audiobook narrator. Expand this book summary into a detailed narration of EXACTLY 1500-2000 words.
+
+Book: "${bookTitle}" by ${bookAuthor}
+Summary: ${bookSummary}
+Key Insights:
+${keyInsights.map((insight, i) => `${i + 1}. ${insight}`).join('\n')}
+
+Instructions:
+1. Introduction to the book and author: 200-300 words
+2. For EACH key insight write 150-200 words explaining it with examples
+3. Conversational and engaging tone
+4. Conclusion with main takeaways: 150-200 words
+5. TOTAL MUST BE between 1500-2000 words - this is critical
+6. No markdown, just plain text for text-to-speech` 
         }] 
       }],
     });

@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import BookCard from './components/BookCard';
 import Reader from './App';
+import Paywall from './components/Paywall';
 import { useBooks } from './hooks/useBooks';
 import { useTheme } from './contexts/ThemeContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -12,7 +13,18 @@ function MainApp() {
   const { theme, setTheme } = useTheme();
   const [selectedBook, setSelectedBook] = React.useState<any>(null);
   const [showSettings, setShowSettings] = React.useState(false);
+  const [showPaywall, setShowPaywall] = React.useState(false);
   const [fontSize, setFontSize] = React.useState<'small' | 'medium' | 'large'>('medium');
+
+  const isPremium = localStorage.getItem('isPremium') === 'true';
+
+  const handleBookClick = (book: any) => {
+    if (book.isPremium && !isPremium) {
+      setShowPaywall(true);
+    } else {
+      setSelectedBook(book);
+    }
+  };
 
   if (loading) {
     return (
@@ -91,9 +103,8 @@ function MainApp() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              onClick={() => setSelectedBook(book)}
             >
-              <BookCard book={book} onClick={setSelectedBook} />
+              <BookCard book={book} onClick={handleBookClick} />
             </motion.div>
           ))}
         </div>
@@ -170,6 +181,11 @@ function MainApp() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Paywall Modal */}
+      {showPaywall && (
+        <Paywall onClose={() => setShowPaywall(false)} />
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Check, X, Sparkles, Zap, Shield, Star } from 'lucide-react';
+import { Check, X, Sparkles, Zap, Shield, Star, Lock, MessageSquare, Volume2 } from 'lucide-react';
 
 interface PaywallProps {
   onClose: () => void;
@@ -40,10 +40,10 @@ export default function Paywall({ onClose }: PaywallProps) {
             
             <ul className="space-y-6">
               {[
-                { icon: Zap, text: 'Unlimited access to 5,000+ summaries' },
-                { icon: Star, text: 'Exclusive audio narrations' },
-                { icon: Shield, text: 'Offline reading & listening' },
-                { icon: Check, text: 'Personalized reading lists' }
+                { icon: Star, text: 'Unlock All 110 Books (vs 44 free)' },
+                { icon: MessageSquare, text: 'AI Chat Assistant for every book' },
+                { icon: Volume2, text: 'Audio Narration for all books' },
+                { icon: Zap, text: 'Unlimited reading & listening' }
               ].map((item, i) => (
                 <li key={i} className="flex items-start gap-4">
                   <div className="mt-1 p-1 bg-emerald-500 rounded-lg">
@@ -62,16 +62,16 @@ export default function Paywall({ onClose }: PaywallProps) {
               <div className="space-y-4">
                 <div className="p-4 border-2 border-emerald-600 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 relative">
                   <div className="absolute -top-3 right-4 bg-emerald-600 text-white text-[10px] font-bold px-2 py-1 rounded-full">
-                    BEST VALUE
+                    MOST POPULAR
                   </div>
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="font-bold text-stone-900 dark:text-white">Annual</p>
-                      <p className="text-xs text-stone-500">7 days free trial</p>
+                      <p className="text-xs text-stone-500">Save $12 - 2 months free!</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-stone-900 dark:text-white">$79.99/yr</p>
-                      <p className="text-xs text-stone-400">$6.67/mo</p>
+                      <p className="font-bold text-stone-900 dark:text-white">$60/yr</p>
+                      <p className="text-xs text-stone-400">$5/mo</p>
                     </div>
                   </div>
                 </div>
@@ -83,7 +83,7 @@ export default function Paywall({ onClose }: PaywallProps) {
                       <p className="text-xs text-stone-500">Cancel anytime</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-stone-900 dark:text-white">$12.99/mo</p>
+                      <p className="font-bold text-stone-900 dark:text-white">$6/mo</p>
                     </div>
                   </div>
                 </div>

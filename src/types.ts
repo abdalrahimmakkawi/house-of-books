@@ -23,6 +23,7 @@ export interface Book {
   summary: string;
   longSummary?: string;
   keyInsights: string[];
+  isPremium?: boolean;
 }
 
 export type Category = 'Self-Improvement' | 'Business' | 'Psychology' | 'Technology' | 'History';
