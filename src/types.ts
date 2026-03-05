@@ -21,6 +21,7 @@ export interface Book {
   category: string;
   readTime: number; // in minutes
   summary: string;
+  longSummary?: string;
   keyInsights: string[];
 }
 

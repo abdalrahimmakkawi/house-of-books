@@ -85,19 +85,29 @@ export async function generateBookNarration(text: string): Promise<string | null
   }
 }
 
-export async function askBookQuestion(bookTitle: string, bookSummary: string, question: string): Promise<string | null> {
+export async function askBookQuestion(bookTitle: string, bookSummary: string, question: string, chatHistory?: {role: 'user' | 'ai', text: string}[]): Promise<string | null> {
   try {
+    // Build conversation history context
+    let conversationHistory = '';
+    if (chatHistory && chatHistory.length > 0) {
+      conversationHistory = chatHistory.map(msg => 
+        `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.text}`
+      ).join('\n');
+      conversationHistory += '\n\n';
+    }
+
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
       contents: [{ 
         parts: [{ 
-          text: `You are an expert on the book "${bookTitle}". 
-          Here is a summary of the book: ${bookSummary}. 
-          
-          The user has a question about this book: "${question}". 
-          
-          Provide a concise, insightful, and helpful answer based on the summary and your general knowledge of this book. 
-          Keep the tone professional and engaging.` 
+          text: `You are an expert on book "${bookTitle}". 
+            Here is a summary of the book: ${bookSummary}. 
+            
+            ${conversationHistory ? `Previous conversation:\n${conversationHistory}\n\n` : ''}
+            The user has a question about this book: "${question}". 
+            
+            Provide a concise, insightful, and helpful answer based on the summary, your general knowledge of this book, and the conversation context.
+            Keep tone professional and engaging.` 
         }] 
       }],
     });

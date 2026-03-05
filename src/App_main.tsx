@@ -5,12 +5,14 @@ import Reader from './App';
 import { useBooks } from './hooks/useBooks';
 import { useTheme } from './contexts/ThemeContext';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Settings, Trash2, Type } from 'lucide-react';
 
 function MainApp() {
   const { books, loading } = useBooks();
-  const { theme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [selectedBook, setSelectedBook] = React.useState<any>(null);
+  const [showSettings, setShowSettings] = React.useState(false);
+  const [fontSize, setFontSize] = React.useState<'small' | 'medium' | 'large'>('medium');
 
   if (loading) {
     return (
@@ -22,6 +24,23 @@ function MainApp() {
       </div>
     );
   }
+
+  const clearReadingHistory = () => {
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('progress-')) {
+        localStorage.removeItem(key);
+      }
+    });
+    alert('Reading history cleared!');
+  };
+
+  const getFontSizeClass = () => {
+    switch(fontSize) {
+      case 'small': return 'text-sm';
+      case 'large': return 'text-lg';
+      default: return 'text-base';
+    }
+  };
 
   if (selectedBook) {
     return (
@@ -40,8 +59,13 @@ function MainApp() {
           <h1 className="text-2xl font-bold text-stone-900 dark:text-white">
             House of Books
           </h1>
-          <div className="text-sm text-stone-600 dark:text-stone-400">
-            Your Personal Library
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
+            >
+              <Settings size={20} className="text-stone-600 dark:text-stone-400" />
+            </button>
           </div>
         </div>
       </header>
@@ -62,6 +86,79 @@ function MainApp() {
           ))}
         </div>
       </main>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-stone-900 rounded-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-stone-900 dark:text-white">Settings</h2>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
+              >
+                <Settings size={20} className="text-stone-600 dark:text-stone-400" />
+              </button>
+            </div>
+
+            {/* Font Size */}
+            <div className="mb-6">
+              <label className="flex items-center gap-2 text-sm font-medium text-stone-700 dark:text-stone-300 mb-3">
+                <Type size={16} />
+                Font Size
+              </label>
+              <div className="flex gap-2">
+                {(['small', 'medium', 'large'] as const).map(size => (
+                  <button
+                    key={size}
+                    onClick={() => setFontSize(size)}
+                    className={`px-4 py-2 rounded-lg capitalize transition-colors ${
+                      fontSize === size
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Theme */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-3">
+                Theme
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['light', 'dark', 'classic', 'nature', 'beach', 'cosmos'] as const).map(themeOption => (
+                  <button
+                    key={themeOption}
+                    onClick={() => setTheme(themeOption)}
+                    className={`px-3 py-2 rounded-lg capitalize text-sm transition-colors ${
+                      theme === themeOption
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700'
+                    }`}
+                  >
+                    {themeOption}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Clear History */}
+            <div className="mb-6">
+              <button
+                onClick={clearReadingHistory}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              >
+                <Trash2 size={16} />
+                Clear Reading History
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

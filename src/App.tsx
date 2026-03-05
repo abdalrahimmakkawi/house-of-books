@@ -13,6 +13,7 @@ interface ReaderProps {
 }
 
 export default function Reader({ book, onClose }: ReaderProps) {
+  console.log('Reader book data:', book);
   const { isPlaying, progress, togglePlay, seek } = useAudioPlayer();
   const { theme, setTheme, activeAmbient, ambientVolume, setAmbientVolume, playAmbient } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
@@ -38,6 +39,9 @@ export default function Reader({ book, onClose }: ReaderProps) {
   const [isAsking, setIsAsking] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
+  
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'summary' | 'insights' | 'author'>('summary');
 
   useEffect(() => {
     localStorage.setItem('reader-settings', JSON.stringify(settings));
@@ -185,7 +189,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
     setChatHistory(prev => [...prev, { role: 'user', text: question }]);
     setIsAsking(true);
 
-    const answer = await askBookQuestion(book.title, book.summary, question);
+    const answer = await askBookQuestion(book.title, book.summary, question, chatHistory);
     setIsAsking(false);
 
     if (answer) {
@@ -463,15 +467,36 @@ export default function Reader({ book, onClose }: ReaderProps) {
 
         {/* Content Tabs */}
         <div className="border-b border-stone-200 dark:border-stone-800 mb-12 flex gap-8">
-          <button className="pb-4 border-b-2 border-emerald-600 text-emerald-600 font-semibold flex items-center gap-2">
+          <button 
+            onClick={() => setActiveTab('summary')}
+            className={`pb-4 border-b-2 font-semibold flex items-center gap-2 transition-colors ${
+              activeTab === 'summary' 
+                ? 'border-emerald-600 text-emerald-600' 
+                : 'border-transparent text-stone-400 hover:text-stone-600'
+            }`}
+          >
             <BookOpen size={18} />
             Summary
           </button>
-          <button className="pb-4 border-b-2 border-transparent text-stone-400 hover:text-stone-600 transition-colors flex items-center gap-2">
+          <button 
+            onClick={() => setActiveTab('insights')}
+            className={`pb-4 border-b-2 font-semibold flex items-center gap-2 transition-colors ${
+              activeTab === 'insights' 
+                ? 'border-emerald-600 text-emerald-600' 
+                : 'border-transparent text-stone-400 hover:text-stone-600'
+            }`}
+          >
             <List size={18} />
             Key Insights
           </button>
-          <button className="pb-4 border-b-2 border-transparent text-stone-400 hover:text-stone-600 transition-colors flex items-center gap-2">
+          <button 
+            onClick={() => setActiveTab('author')}
+            className={`pb-4 border-b-2 font-semibold flex items-center gap-2 transition-colors ${
+              activeTab === 'author' 
+                ? 'border-emerald-600 text-emerald-600' 
+                : 'border-transparent text-stone-400 hover:text-stone-600'
+            }`}
+          >
             <Info size={18} />
             About Author
           </button>
@@ -485,24 +510,46 @@ export default function Reader({ book, onClose }: ReaderProps) {
             lineHeight: settings.lineHeight
           }}
         >
-          <h2 className="font-serif text-3xl mb-6 dark:text-white nature:text-emerald-50 classic:text-amber-50">Introduction</h2>
-          <p className="text-stone-700 dark:text-stone-300 nature:text-emerald-100/80 classic:text-amber-100/80 leading-relaxed mb-8">
-            {book.summary}
-          </p>
+          {activeTab === 'summary' && (
+            <>
+              <h2 className="font-serif text-3xl mb-6 dark:text-white nature:text-emerald-50 classic:text-amber-50">Introduction</h2>
+              <p className="text-stone-700 dark:text-stone-300 nature:text-emerald-100/80 classic:text-amber-100/80 leading-relaxed mb-8">
+                {book.summary || book.longSummary || 'Summary coming soon'}
+              </p>
+            </>
+          )}
           
-          <h2 className="font-serif text-3xl mb-6 dark:text-white nature:text-emerald-50 classic:text-amber-50">Key Insights</h2>
-          <div className="space-y-8">
-            {book.keyInsights.map((insight, index) => (
-              <div key={index} className="flex gap-6">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 nature:bg-emerald-900/40 text-emerald-600 nature:text-emerald-400 flex items-center justify-center font-bold text-lg">
-                  {index + 1}
-                </div>
-                <p className="text-stone-700 dark:text-stone-300 nature:text-emerald-100/80 classic:text-amber-100/80 leading-relaxed pt-1">
-                  {insight}
+          {activeTab === 'insights' && (
+            <>
+              <h2 className="font-serif text-3xl mb-6 dark:text-white nature:text-emerald-50 classic:text-amber-50">Key Insights</h2>
+              <div className="space-y-8">
+                {book.keyInsights.map((insight, index) => (
+                  <div key={index} className="flex gap-6">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 nature:bg-emerald-900/40 text-emerald-600 nature:text-emerald-400 flex items-center justify-center font-bold text-lg">
+                      {index + 1}
+                    </div>
+                    <p className="text-stone-700 dark:text-stone-300 nature:text-emerald-100/80 classic:text-amber-100/80 leading-relaxed pt-1">
+                      {insight}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          
+          {activeTab === 'author' && (
+            <>
+              <h2 className="font-serif text-3xl mb-6 dark:text-white nature:text-emerald-50 classic:text-amber-50">About the Author</h2>
+              <div className="bg-stone-50 dark:bg-stone-800/50 nature:bg-emerald-50/30 classic:bg-amber-50/30 rounded-xl p-8 mb-8">
+                <h3 className="text-xl font-bold mb-4 text-stone-900 dark:text-stone-100 nature:text-emerald-900 classic:text-amber-900">
+                  {book.author}
+                </h3>
+                <p className="text-stone-600 dark:text-stone-400 nature:text-emerald-700/80 classic:text-amber-700/80 leading-relaxed">
+                  {book.author} is the author of "{book.title}". This book provides valuable insights and perspectives that have helped countless readers achieve personal and professional growth.
                 </p>
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </article>
       </div>
 

@@ -18,9 +18,30 @@ export function useBooks() {
           return;
         }
 
+        console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+
+        // Step 1: Simple query to see ALL columns
+        const { data: simpleData, error: simpleError } = await supabase
+          .from('books')
+          .select('*')
+          .limit(1);
+        
+        console.log('Simple query result:', simpleData);
+        console.log('Query error:', simpleError);
+
+        // Step 2: Try with summaries
+        const { data: summaryData, error: summaryError } = await supabase
+          .from('books')
+          .select('*, summaries(*)')
+          .limit(1);
+        
+        console.log('With summaries:', summaryData);
+        console.log('Summary query error:', summaryError);
+
+        // Step 3: Original query
         const { data, error } = await supabase
           .from('books')
-          .select('*, summaries(short_summary, long_summary)')
+          .select('*, summaries(short_summary, long_summary, key_insights)')
           .order('title');
         
         if (error) {
@@ -28,16 +49,19 @@ export function useBooks() {
           console.log('Falling back to sample books');
           setBooks(SAMPLE_BOOKS);
         } else if (data) {
+          console.log('Raw Supabase row:', JSON.stringify(data[0], null, 2));
           const mapped = data.map(b => ({
             id: b.id,
             title: b.title,
             author: b.author,
             coverUrl: b.cover_url,
             category: b.category,
-            readTime: b.read_time || 15,
+            readTime: b.read_time_mins || 15,
             summary: b.summaries?.[0]?.short_summary || '',
-            keyInsights: b.key_insights || []
+            longSummary: b.summaries?.[0]?.long_summary || '',
+            keyInsights: b.summaries?.[0]?.key_insights || [],
           }));
+          console.log('Mapped book:', mapped[0]);
           setBooks(mapped);
         }
       } catch (error) {
