@@ -7,11 +7,9 @@ interface PaywallProps {
 }
 
 export default function Paywall({ onClose }: PaywallProps) {
-  const handleMonthlyCheckout = () => {
-    window.open('https://house-of-books.lemonsqueezy.com/checkout/buy/df5fc3da-2939-4d0e-afaa-1f15b56610aa?variant=1370006', '_blank');
-  };
+  const [selectedPlan, setSelectedPlan] = React.useState<'monthly' | 'annual'>('annual');
 
-  const handleYearlyCheckout = () => {
+  const handleCheckout = () => {
     window.open('https://house-of-books.lemonsqueezy.com/checkout/buy/df5fc3da-2939-4d0e-afaa-1f15b56610aa?variant=1370006', '_blank');
   };
 
@@ -93,10 +91,19 @@ export default function Paywall({ onClose }: PaywallProps) {
             <div className="mb-8">
               <h3 className="text-stone-400 text-xs font-bold uppercase tracking-widest mb-2">Choose Plan</h3>
               <div className="space-y-4">
-                <div className="p-4 border-2 border-emerald-600 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 relative">
-                  <div className="absolute -top-3 right-4 bg-emerald-600 text-white text-[10px] font-bold px-2 py-1 rounded-full">
-                    MOST POPULAR
-                  </div>
+                <div 
+                  className={`p-4 border-2 rounded-2xl cursor-pointer transition-all relative ${
+                    selectedPlan === 'annual' 
+                      ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-900/10' 
+                      : 'border-stone-200 dark:border-stone-800 hover:border-emerald-600'
+                  }`}
+                  onClick={() => setSelectedPlan('annual')}
+                >
+                  {selectedPlan === 'annual' && (
+                    <div className="absolute -top-3 right-4 bg-emerald-600 text-white text-[10px] font-bold px-2 py-1 rounded-full">
+                      MOST POPULAR
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="font-bold text-stone-900 dark:text-white">Annual</p>
@@ -107,15 +114,16 @@ export default function Paywall({ onClose }: PaywallProps) {
                       <p className="text-xs text-stone-400">$5/mo</p>
                     </div>
                   </div>
-                  <button 
-                    onClick={handleYearlyCheckout}
-                    className="w-full mt-3 bg-emerald-600 text-white py-2 rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
-                  >
-                    Get Annual Plan
-                  </button>
                 </div>
 
-                <div className="p-4 border border-stone-200 dark:border-stone-800 rounded-2xl hover:border-emerald-600 transition-colors cursor-pointer">
+                <div 
+                  className={`p-4 border rounded-2xl cursor-pointer transition-all ${
+                    selectedPlan === 'monthly' 
+                      ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-900/10' 
+                      : 'border-stone-200 dark:border-stone-800 hover:border-emerald-600'
+                  }`}
+                  onClick={() => setSelectedPlan('monthly')}
+                >
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="font-bold text-stone-900 dark:text-white">Monthly</p>
@@ -125,25 +133,19 @@ export default function Paywall({ onClose }: PaywallProps) {
                       <p className="font-bold text-stone-900 dark:text-white">$6/mo</p>
                     </div>
                   </div>
-                  <button 
-                    onClick={handleMonthlyCheckout}
-                    className="w-full mt-3 bg-stone-900 text-white py-2 rounded-lg font-semibold hover:bg-stone-800 transition-colors"
-                  >
-                    Get Monthly Plan
-                  </button>
                 </div>
               </div>
             </div>
 
             <div className="space-y-4">
               <button 
-                onClick={handleStartFree}
+                onClick={handleCheckout}
                 className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
               >
-                Start Free - Access 44 Books
+                Start 7-Day Free Trial
               </button>
               <p className="text-[10px] text-stone-400 text-center uppercase tracking-widest">
-                No commitment. Cancel anytime.
+                {selectedPlan === 'annual' ? '$60/year after trial' : '$6/month after trial'} • No commitment. Cancel anytime.
               </p>
             </div>
           </div>

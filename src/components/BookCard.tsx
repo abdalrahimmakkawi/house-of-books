@@ -26,8 +26,8 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
         />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
         {book.isPremium && (
-          <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm rounded-full p-2">
-            <Lock size={16} className="text-white" />
+          <div className="absolute top-2 right-2 bg-black/70 rounded-full p-1.5" title="Premium - Unlock for $6/mo">
+            <Lock size={14} className="text-amber-400" />
           </div>
         )}
       </div>
