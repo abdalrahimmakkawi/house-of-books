@@ -7,6 +7,17 @@ interface PaywallProps {
 }
 
 export default function Paywall({ onClose }: PaywallProps) {
+  const handleMonthlyCheckout = () => {
+    window.open('https://house-of-books.lemonsqueezy.com/checkout/buy/df5fc3da-2939-4d0e-afaa-1f15b56610aa?variant=1370006', '_blank');
+  };
+
+  const handleYearlyCheckout = () => {
+    window.open('https://house-of-books.lemonsqueezy.com/checkout/buy/df5fc3da-2939-4d0e-afaa-1f15b56610aa?variant=1370006', '_blank');
+  };
+
+  const handleStartFree = () => {
+    onClose();
+  };
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -38,21 +49,43 @@ export default function Paywall({ onClose }: PaywallProps) {
               Unlock the full potential of your mind.
             </h2>
             
-            <ul className="space-y-6">
-              {[
-                { icon: Star, text: 'Unlock All 110 Books (vs 44 free)' },
-                { icon: MessageSquare, text: 'AI Chat Assistant for every book' },
-                { icon: Volume2, text: 'Audio Narration for all books' },
-                { icon: Zap, text: 'Unlimited reading & listening' }
-              ].map((item, i) => (
-                <li key={i} className="flex items-start gap-4">
-                  <div className="mt-1 p-1 bg-emerald-500 rounded-lg">
-                    <item.icon size={16} />
-                  </div>
-                  <span className="text-emerald-50 text-sm leading-relaxed">{item.text}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-6 mb-8">
+              <div className="bg-emerald-700/30 rounded-lg p-4">
+                <h4 className="font-bold text-emerald-100 mb-2">Free Plan</h4>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-center gap-2">
+                    <Check size={14} className="text-emerald-200" />
+                    <span className="text-emerald-50">44 Books (40% of library)</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-emerald-300/60">
+                    <X size={14} />
+                    <span className="line-through">AI Chat Assistant</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-emerald-300/60">
+                    <X size={14} />
+                    <span className="line-through">Audio Narration</span>
+                  </li>
+                </ul>
+              </div>
+              
+              <div className="bg-white/10 rounded-lg p-4">
+                <h4 className="font-bold text-emerald-100 mb-2">Premium Plan</h4>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-center gap-2">
+                    <Check size={14} className="text-emerald-200" />
+                    <span className="text-emerald-50">110 Books (Full library)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check size={14} className="text-emerald-200" />
+                    <span className="text-emerald-50">AI Chat Assistant</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check size={14} className="text-emerald-200" />
+                    <span className="text-emerald-50">Audio Narration</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
 
           {/* Right Side: Pricing */}
@@ -74,6 +107,12 @@ export default function Paywall({ onClose }: PaywallProps) {
                       <p className="text-xs text-stone-400">$5/mo</p>
                     </div>
                   </div>
+                  <button 
+                    onClick={handleYearlyCheckout}
+                    className="w-full mt-3 bg-emerald-600 text-white py-2 rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
+                  >
+                    Get Annual Plan
+                  </button>
                 </div>
 
                 <div className="p-4 border border-stone-200 dark:border-stone-800 rounded-2xl hover:border-emerald-600 transition-colors cursor-pointer">
@@ -86,16 +125,27 @@ export default function Paywall({ onClose }: PaywallProps) {
                       <p className="font-bold text-stone-900 dark:text-white">$6/mo</p>
                     </div>
                   </div>
+                  <button 
+                    onClick={handleMonthlyCheckout}
+                    className="w-full mt-3 bg-stone-900 text-white py-2 rounded-lg font-semibold hover:bg-stone-800 transition-colors"
+                  >
+                    Get Monthly Plan
+                  </button>
                 </div>
               </div>
             </div>
 
-            <button className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 mb-4">
-              Start 7-Day Free Trial
-            </button>
-            <p className="text-[10px] text-stone-400 text-center uppercase tracking-widest">
-              No commitment. Cancel anytime.
-            </p>
+            <div className="space-y-4">
+              <button 
+                onClick={handleStartFree}
+                className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
+              >
+                Start Free - Access 44 Books
+              </button>
+              <p className="text-[10px] text-stone-400 text-center uppercase tracking-widest">
+                No commitment. Cancel anytime.
+              </p>
+            </div>
           </div>
         </div>
       </motion.div>
