@@ -16,10 +16,22 @@ function MainApp() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FDFCFB] dark:bg-stone-950 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 size={32} className="animate-spin text-emerald-600 mx-auto mb-4" />
-          <p className="text-stone-600 dark:text-stone-400">Loading books...</p>
+      <div className="min-h-screen bg-[#FDFCFB] dark:bg-stone-950">
+        <div className="max-w-7xl mx-auto px-6 py-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            {[...Array(8)].map((_, index) => (
+              <div key={index} className="animate-pulse">
+                <div className="bg-white dark:bg-stone-800 rounded-xl overflow-hidden shadow-lg">
+                  <div className="h-64 bg-stone-200 dark:bg-stone-700"></div>
+                  <div className="p-6">
+                    <div className="h-6 bg-stone-200 dark:bg-stone-700 rounded mb-3"></div>
+                    <div className="h-4 bg-stone-200 dark:bg-stone-700 rounded mb-2"></div>
+                    <div className="h-4 bg-stone-200 dark:bg-stone-700 rounded w-3/4"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );

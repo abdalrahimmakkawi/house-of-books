@@ -19,8 +19,6 @@ export async function generateBookNarration(text: string): Promise<string | null
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (base64Audio) {
-      console.log("Narration generated successfully, length:", base64Audio.length);
-      
       try {
         const cleanBase64 = base64Audio.replace(/\s/g, '');
         const binaryString = atob(cleanBase64);

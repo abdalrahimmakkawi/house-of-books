@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ChevronLeft, Bookmark, Share2, Play, Pause, BookOpen, List, Info, SkipBack, SkipForward, Volume2, Palette, Music, Loader2, MessageSquare, Send, Type, Sparkles } from 'lucide-react';
+import { X, ChevronLeft, Bookmark, Share2, Play, Pause, BookOpen, List, Info, SkipBack, SkipForward, Volume2, Palette, Music, Loader2, MessageSquare, Send, Type, Sparkles, Settings } from 'lucide-react';
 import { Book, Theme, ReaderSettings } from "./types";
 import { useAudioPlayer } from "./hooks/useAudioPlayer";
 import { useTheme, AMBIENT_SOUNDS } from "./contexts/ThemeContext";
@@ -13,7 +13,6 @@ interface ReaderProps {
 }
 
 export default function Reader({ book, onClose }: ReaderProps) {
-  console.log('Reader book data:', book);
   const { isPlaying, progress, togglePlay, seek } = useAudioPlayer();
   const { theme, setTheme, activeAmbient, ambientVolume, setAmbientVolume, playAmbient } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
@@ -42,6 +41,8 @@ export default function Reader({ book, onClose }: ReaderProps) {
   
   // Tab State
   const [activeTab, setActiveTab] = useState<'summary' | 'insights' | 'author'>('summary');
+  const [authorBio, setAuthorBio] = useState<string>('');
+  const [isGeneratingBio, setIsGeneratingBio] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('reader-settings', JSON.stringify(settings));
@@ -197,6 +198,28 @@ export default function Reader({ book, onClose }: ReaderProps) {
     }
   };
 
+  const generateAuthorBio = async () => {
+    if (authorBio || isGeneratingBio) return;
+    
+    setIsGeneratingBio(true);
+    try {
+      const bio = await askBookQuestion(book.title, book.summary, "Tell me about the author of this book in 3 paragraphs");
+      if (bio) {
+        setAuthorBio(bio);
+      }
+    } catch (error) {
+      setAuthorBio(`${book.author} is the author of "${book.title}". This book provides valuable insights and perspectives that have helped countless readers achieve personal and professional growth.`);
+    } finally {
+      setIsGeneratingBio(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'author' && !authorBio && !isGeneratingBio) {
+      generateAuthorBio();
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
@@ -237,24 +260,18 @@ export default function Reader({ book, onClose }: ReaderProps) {
         >
           <ChevronLeft size={24} className="dark:text-white nature:text-emerald-100 classic:text-amber-100" />
         </button>
-        
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setShowSettings(!showSettings)}
-            className={`p-2 rounded-full transition-colors ${showSettings ? 'bg-emerald-600 text-white' : 'hover:bg-stone-100 dark:hover:bg-stone-800'}`}
-          >
-            <Palette size={20} className={showSettings ? 'text-white' : 'dark:text-white nature:text-emerald-100 classic:text-amber-100'} />
-          </button>
-          <button className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-full transition-colors">
-            <Bookmark size={20} className="dark:text-white nature:text-emerald-100 classic:text-amber-100" />
-          </button>
-          <button 
-            onClick={handleShare}
-            className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-full transition-colors"
-          >
-            <Share2 size={20} className="dark:text-white nature:text-emerald-100 classic:text-amber-100" />
-          </button>
-        </div>
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className="p-2 sm:p-3 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
+        >
+          <Settings size={18} className="text-stone-600 dark:text-stone-400" />
+        </button>
+        <button
+          onClick={onClose}
+          className="p-2 sm:p-3 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
+        >
+          <X size={18} className="text-stone-600 dark:text-stone-400" />
+        </button>
       </header>
 
       {/* Settings Panel */}
@@ -544,9 +561,16 @@ export default function Reader({ book, onClose }: ReaderProps) {
                 <h3 className="text-xl font-bold mb-4 text-stone-900 dark:text-stone-100 nature:text-emerald-900 classic:text-amber-900">
                   {book.author}
                 </h3>
-                <p className="text-stone-600 dark:text-stone-400 nature:text-emerald-700/80 classic:text-amber-700/80 leading-relaxed">
-                  {book.author} is the author of "{book.title}". This book provides valuable insights and perspectives that have helped countless readers achieve personal and professional growth.
-                </p>
+                {isGeneratingBio ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={24} className="animate-spin text-emerald-600 mr-3" />
+                    <span className="text-stone-600 dark:text-stone-400">Generating author bio...</span>
+                  </div>
+                ) : (
+                  <p className="text-stone-600 dark:text-stone-400 nature:text-emerald-700/80 classic:text-amber-700/80 leading-relaxed">
+                    {authorBio || `${book.author} is the author of "${book.title}". This book provides valuable insights and perspectives that have helped countless readers achieve personal and professional growth.`}
+                  </p>
+                )}
               </div>
             </>
           )}

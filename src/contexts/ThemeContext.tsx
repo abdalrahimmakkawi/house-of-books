@@ -31,6 +31,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [activeAmbient, setActiveAmbient] = useState('none');
   const [ambientVolume, setAmbientVolume] = useState(0.3);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isLoading = useRef(false);
   const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -67,15 +68,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     const loadNewAudio = () => {
       if (!sound || !sound.url) return;
+      if (isLoading.current) return;
+      
+      isLoading.current = true;
       audio.src = sound.url;
       audio.load();
       audio.volume = ambientVolume;
-      audio.play().catch(err => console.error('Error playing audio:', err));
+      audio.play()
+        .then(() => { isLoading.current = false; })
+        .catch(() => { isLoading.current = false; });
     };
 
     if (sound && sound.url) {
       if (audio.src.includes(sound.url)) {
-        if (audio.paused) audio.play().catch(err => console.error(err));
+        if (audio.paused) audio.play().catch(err => {});
         return;
       }
       audio.pause();
