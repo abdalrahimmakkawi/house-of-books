@@ -1,4 +1,4 @@
-export type Theme = 'light' | 'dark' | 'classic' | 'nature' | 'beach';
+export type Theme = 'light' | 'dark' | 'classic' | 'nature' | 'beach' | 'cosmos';
 
 export interface ReaderSettings {
   fontSize: number;

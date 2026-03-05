@@ -270,7 +270,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
                   Themes
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {(['light', 'dark', 'classic', 'nature', 'beach'] as Theme[]).map(t => (
+                  {(['light', 'dark', 'classic', 'nature', 'beach', 'cosmos'] as Theme[]).map(t => (
                     <button
                       key={t}
                       onClick={() => setTheme(t)}

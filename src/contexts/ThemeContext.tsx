@@ -3,10 +3,11 @@ import { Theme, AmbientSound } from '../types';
 
 export const AMBIENT_SOUNDS: AmbientSound[] = [
   { id: 'none', name: 'None', url: '', icon: 'X' },
-  { id: 'library', name: 'Ancient Library', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', icon: 'Book' },
-  { id: 'forest', name: 'Nature Forest', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', icon: 'Trees' },
-  { id: 'beach', name: 'Ocean Beach', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', icon: 'Waves' },
-  { id: 'rain', name: 'Rainy Day', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3', icon: 'CloudRain' },
+  { id: 'library', name: 'Ancient Library', url: '/audio/library.mp3', icon: 'Book' },
+  { id: 'forest', name: 'Nature Forest', url: '/audio/forest.mp3', icon: 'Trees' },
+  { id: 'beach', name: 'Ocean Beach', url: '/audio/beach.mp3', icon: 'Waves' },
+  { id: 'rain', name: 'Rainy Day', url: '/audio/rain.mp3', icon: 'CloudRain' },
+  { id: 'cosmos', name: 'Cosmic Space', url: '/audio/cosmos.mp3', icon: 'Sparkles' },
 ];
 
 interface ThemeContextType {
@@ -48,7 +49,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove('light', 'dark', 'classic', 'nature', 'beach');
+    root.classList.remove('light', 'dark', 'classic', 'nature', 'beach', 'cosmos');
     root.classList.add(theme);
     localStorage.setItem('theme', theme);
   }, [theme]);

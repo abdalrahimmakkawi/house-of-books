@@ -28,6 +28,7 @@
     --glass-bg: rgba(44, 30, 18, 0.8);
     --glass-border: rgba(230, 213, 184, 0.1);
     --bg-gradient: radial-gradient(circle at center, #3D2B1B 0%, #1A120B 100%);
+    --bg-image: url('/images/classic.jpg');
   }
 
   .nature {
@@ -36,6 +37,7 @@
     --glass-bg: rgba(15, 26, 15, 0.8);
     --glass-border: rgba(209, 232, 209, 0.1);
     --bg-gradient: radial-gradient(circle at center, #1A2E1A 0%, #080D08 100%);
+    --bg-image: url('/images/nature.jpg');
   }
 
   .beach {
@@ -44,18 +46,33 @@
     --glass-bg: rgba(10, 25, 47, 0.8);
     --glass-border: rgba(204, 214, 246, 0.1);
     --bg-gradient: radial-gradient(circle at center, #112240 0%, #020C1B 100%);
+    --bg-image: url('/images/beach.jpg');
+  }
+
+  .cosmos {
+    --bg-primary: #0a0015;
+    --text-primary: #E8D5FF;
+    --glass-bg: rgba(10, 0, 21, 0.75);
+    --glass-border: rgba(232, 213, 255, 0.15);
+    --bg-image: url('/images/cosmos.jpg');
   }
 
   body {
     background-color: var(--bg-primary);
-    background-image: var(--bg-gradient, none);
+    background-image: var(--bg-image, none);
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
     color: var(--text-primary);
     @apply antialiased transition-colors duration-500;
   }
 
   .main-bg, .reader-bg {
     background-color: var(--bg-primary) !important;
-    background-image: var(--bg-gradient, none) !important;
+    background-image: var(--bg-image, none) !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-attachment: fixed !important;
     color: var(--text-primary) !important;
   }
 
