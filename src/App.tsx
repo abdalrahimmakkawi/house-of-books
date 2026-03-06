@@ -94,7 +94,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
   };
 
   const handleStartNarration = async () => {
-    if (!isPremium) {
+    if (book.isPremium && !isPremium) {
       setShowPaywall(true);
       return;
     }
@@ -194,7 +194,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
   const handleAskQuestion = async () => {
     if (!chatQuestion.trim() || isAsking) return;
     
-    if (!isPremium) {
+    if (book.isPremium && !isPremium) {
       setShowPaywall(true);
       return;
     }

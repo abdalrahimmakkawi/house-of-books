@@ -9,6 +9,8 @@ interface BookCardProps {
 }
 
 const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
+  console.log('Rendering book:', book.title, 'isPremium:', book.isPremium);
+  
   return (
     <motion.div
       layoutId={`book-${book.id}`}
@@ -26,13 +28,13 @@ const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
         />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
         {book.isPremium && (
-          <div className="absolute top-2 right-2 bg-black/70 rounded-full p-1.5" title="Premium - Unlock for $6/mo">
+          <div className="absolute top-2 right-2 z-50 bg-black/70 backdrop-blur-sm rounded-full p-1.5" title="Premium - Unlock for $6/mo">
             <Lock size={14} className="text-amber-400" />
           </div>
         )}
       </div>
       
-      <div className="flex flex-col flex-grow">
+      <div className="flex flex-col grow">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 mb-1">
           {book.category}
         </span>

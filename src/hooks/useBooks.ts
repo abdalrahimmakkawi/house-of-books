@@ -9,11 +9,18 @@ export function useBooks() {
 
   useEffect(() => {
     async function fetchBooks() {
+      console.log('SUPABASE URL:', import.meta.env.VITE_SUPABASE_URL);
+      console.log('SUPABASE KEY exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+      
       try {
         // Check if Supabase is configured
         if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
           console.log('Using sample books - Supabase not configured');
-          setBooks(SAMPLE_BOOKS);
+          const sampleBooksWithPremium = SAMPLE_BOOKS.map((book, index) => ({
+            ...book,
+            isPremium: index >= 2, // Books 3+ are premium (for testing with sample data)
+          }));
+          setBooks(sampleBooksWithPremium);
           setLoading(false);
           return;
         }
@@ -30,7 +37,11 @@ export function useBooks() {
         if (error) {
           console.error('Error fetching books from Supabase:', error);
           console.log('Falling back to sample books');
-          setBooks(SAMPLE_BOOKS);
+          const sampleBooksWithPremium = SAMPLE_BOOKS.map((book, index) => ({
+            ...book,
+            isPremium: index >= 2, // Books 3+ are premium (for testing with sample data)
+          }));
+          setBooks(sampleBooksWithPremium);
         } else if (data) {
           const mapped = data.map((b, index) => ({
             id: b.id,
@@ -45,14 +56,22 @@ export function useBooks() {
             isPremium: index >= 44, // Books 45+ are premium
           }));
 
-          // Filter books based on premium status
-          const filteredBooks = isPremium ? mapped : mapped.slice(0, 44);
+          console.log('Total books:', mapped.length);
+          console.log('Free books:', mapped.filter(b => !b.isPremium).length);
+          console.log('Premium books:', mapped.filter(b => b.isPremium).length);
+
+          // Always show all 110 books - isPremium flag controls access, not filtering
+          const filteredBooks = mapped; 
           setBooks(filteredBooks);
         }
       } catch (error) {
         console.error('Error in fetchBooks:', error);
         console.log('Falling back to sample books');
-        setBooks(SAMPLE_BOOKS);
+        const sampleBooksWithPremium = SAMPLE_BOOKS.map((book, index) => ({
+          ...book,
+          isPremium: index >= 2, // Books 3+ are premium (for testing with sample data)
+        }));
+        setBooks(sampleBooksWithPremium);
       }
       setLoading(false);
     }

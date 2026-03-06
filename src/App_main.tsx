@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import BookCard from './components/BookCard';
 import Reader from './App';
 import Paywall from './components/Paywall';
+import Auth from './components/Auth';
 import { useBooks } from './hooks/useBooks';
 import { useTheme } from './contexts/ThemeContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { supabase } from './lib/supabase';
 import { Loader2, Settings, Trash2, Type } from 'lucide-react';
 
 function MainApp() {
@@ -15,6 +17,26 @@ function MainApp() {
   const [showSettings, setShowSettings] = React.useState(false);
   const [showPaywall, setShowPaywall] = React.useState(false);
   const [fontSize, setFontSize] = React.useState<'small' | 'medium' | 'large'>('medium');
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+    
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (authLoading) return <div className="min-h-screen bg-[#FDFCFB] dark:bg-stone-950 flex items-center justify-center"><Loader2 className="animate-spin" size={32} /></div>;
+  if (!user) return <Auth />;
 
   const isPremium = localStorage.getItem('isPremium') === 'true';
 
