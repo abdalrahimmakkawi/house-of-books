@@ -25,7 +25,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
   const [speechProgress, setSpeechProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [totalTime, setTotalTime] = useState(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const isPremium = localStorage.getItem('isPremium') === 'true';
   
@@ -144,14 +144,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
       setTotalTime(calculatedTotalTime);
       setCurrentTime(0);
       setFullNarration(textToSpeak);
-      
-      // Make sure speech is actually called:
-      const utterance = new SpeechSynthesisUtterance(textToSpeak);
-      utterance.rate = 0.80;
-      console.log('7. Starting speech synthesis...');
-      window.speechSynthesis.cancel(); // Cancel any existing speech
-      window.speechSynthesis.speak(utterance);
-      console.log('8. Speech synthesis started');
+      playSpeech(textToSpeak);
       
     } catch (error) {
       console.error("Error in narration flow:", error);
@@ -168,12 +161,24 @@ export default function Reader({ book, onClose }: ReaderProps) {
     utterance.pitch = 1.05;
     utterance.volume = 1.0;
 
-    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      const words = text.split(' ').length;
+      const total = Math.round((words / 130) * 60);
+      setTotalTime(total);
+      setCurrentTime(0);
+      timerRef.current = setInterval(() => {
+        setCurrentTime(prev => prev + 1);
+      }, 1000);
+    };
+  
     utterance.onend = () => {
       setIsSpeaking(false);
       setSpeechProgress(0);
       setCurrentTime(0);
-    };
+      if (timerRef.current) clearInterval(timerRef.current);
+    };  
+
     utterance.onpause = () => setIsSpeaking(false);
     utterance.onresume = () => setIsSpeaking(true);
     
@@ -472,22 +477,26 @@ export default function Reader({ book, onClose }: ReaderProps) {
             </div>
             
             {isSpeaking && (
-              <div className="w-full mt-4 p-4 glass rounded-xl">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-sm">{formatTime(currentTime)}</span>
-                  <div className="flex-1 h-2 bg-white/20 rounded-full">
+              <div className="w-full mt-4 p-3 bg-black/30 rounded-xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs text-white">{formatTime(currentTime)}</span>
+                  <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-emerald-400 rounded-full transition-all"
-                      style={{ width: `${(currentTime/totalTime)*100}%` }}
+                      className="h-full bg-emerald-400 rounded-full"
+                      style={{ width: `${totalTime > 0 ? (currentTime/totalTime)*100 : 0}%` }}
                     />
                   </div>
-                  <span className="text-sm">{formatTime(totalTime)}</span>
+                  <span className="text-xs text-white">{formatTime(totalTime)}</span>
                 </div>
-                <button onClick={() => {
-                  window.speechSynthesis.cancel();
-                  setIsSpeaking(false);
-                  if (timerRef.current) clearInterval(timerRef.current);
-                }} className="text-sm text-red-400">Stop</button>
+                <button 
+                  onClick={() => {
+                    window.speechSynthesis.cancel();
+                    setIsSpeaking(false);
+                    if (timerRef.current) clearInterval(timerRef.current);
+                  }} 
+                  className="text-xs text-red-400 hover:text-red-300">
+                  ■ Stop
+                </button>
               </div>
             )}
           </div>
