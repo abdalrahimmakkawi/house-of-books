@@ -531,4 +531,4 @@ export default function Reader({ book, onClose }: ReaderProps) {
       )}
     </motion.div>
   );
-}
+} 
