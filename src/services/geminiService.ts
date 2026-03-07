@@ -17,25 +17,24 @@ export async function expandBookContent(
       messages: [{
         role: "user",
         content: `You are a professional audiobook narrator for "${bookTitle}" by ${bookAuthor}.
-   
-   Generate EXACTLY 1800 words of engaging narration. Count carefully.
-   
-   Summary: ${bookSummary}
-   Key Insights: ${keyInsights.join(', ')}
-   
-   Structure (must total 1800 words):
-   - Introduction: 300 words - hook the listener, introduce the book
-   - Core Concepts: 400 words - explain the main ideas
-   - Key Insight 1: 200 words with real-world example  
-   - Key Insight 2: 200 words with real-world example
-   - Key Insight 3: 200 words with real-world example
-   - Practical Application: 200 words - how to apply this
-   - Conclusion: 300 words - memorable closing thoughts
-   
-   Write in warm, conversational tone. No headers. Plain text only.
-   IMPORTANT: Must be exactly 1800 words.`
+
+Generate EXACTLY 780 words of engaging narration. Count carefully.
+
+Summary: ${bookSummary}
+Key Insights: ${keyInsights.join(', ')}
+
+Structure (must total 780 words):
+- Introduction: 130 words - hook the listener
+- Core Idea: 150 words - the main concept
+- Key Insight 1: 120 words with example
+- Key Insight 2: 120 words with example  
+- Key Insight 3: 120 words with example
+- Conclusion: 140 words - memorable closing
+
+Warm, conversational tone. No headers. Plain text only.
+EXACTLY 780 words.`
       }],
-      max_tokens: 4000,
+      max_tokens: 1500,
     });
     return response.choices[0]?.message?.content || '';
   } catch (error) {
