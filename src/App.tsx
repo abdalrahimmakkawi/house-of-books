@@ -94,82 +94,52 @@ export default function Reader({ book, onClose }: ReaderProps) {
   };
 
   const handleStartNarration = async () => {
-    if (book.isPremium && !isPremium) {
-      setShowPaywall(true);
-      return;
-    }
+  if (book.isPremium && !isPremium) {
+    setShowPaywall(true);
+    return;
+  }
 
-    console.log('1. handleStartNarration called');
-    console.log('2. book.summary:', book.summary?.length, 'chars');
-    console.log('3. book.keyInsights:', book.keyInsights?.length, 'items');
-
+  if (isSpeaking) {
     const synth = window.speechSynthesis;
-
-    // If already speaking, handle pause/resume
-    if (isSpeaking) {
-      if (synth.paused) {
-        synth.resume();
-      } else {
-        synth.pause();
-      }
-      return;
+    if (synth.paused) {
+      synth.resume();
+    } else {
+      synth.pause();
     }
+    return;
+  }
 
-    // If we have narration text already, just play it
-    if (fullNarration) {
-      playSpeech(fullNarration);
-      return;
-    }
+  if (fullNarration) {
+    playSpeech(fullNarration);
+    return;
+  }
 
-    setIsGenerating(true);
-    try {
-      const expandedText = await expandBookContent(book.title, book.author, book.summary, book.keyInsights);
-      console.log('4. expandedText length:', expandedText?.length);
-      setIsGenerating(false);
-      
-      let textToSpeak = expandedText;
-      
-      if (!expandedText || expandedText.trim() === '') {
-        console.log("Using fallback text: book.summary");
-        textToSpeak = `${book.title} by ${book.author}. ${book.summary}`;
-      }
-      
-      console.log('5. textToSpeak length:', textToSpeak?.length);
-      console.log('6. textToSpeak preview:', textToSpeak?.substring(0, 100));
-      
-      // Speak immediately to satisfy Chrome's user gesture requirement
-    const shortIntro = `Loading narration for ${book.title} by ${book.author}. Please wait.`;
-    const introUtterance = new SpeechSynthesisUtterance(shortIntro);
-    window.speechSynthesis.speak(introUtterance);
-
-    // Then load full content and queue it
-    const fullText = await expandBookContent(
-      book.title, book.author, book.summary, book.keyInsights
-    );
-
-    const finalTextToSpeak = fullText || `${book.title} by ${book.author}. ${book.summary}`;
-    setFullNarration(finalTextToSpeak);
-
-    // Cancel intro and speak full text
-    window.speechSynthesis.cancel();
-    playSpeech(finalTextToSpeak);
-      
-    } catch (error) {
-      console.error("Error in narration flow:", error);
-      setIsGenerating(false);
-    }
-  };
+  setIsGenerating(true);
+  
+  const expandedText = await expandBookContent(
+    book.title, book.author, book.summary, book.keyInsights
+  );
+  
+  const textToSpeak = expandedText?.trim() 
+    || `${book.title} by ${book.author}. ${book.summary}`;
+  
+  setFullNarration(textToSpeak);
+  setIsGenerating(false);
+  playSpeech(textToSpeak);
+};
 
   const playSpeech = (text: string) => {
+    console.log('playSpeech called, text length:', text.length);
     const synth = window.speechSynthesis;
     synth.cancel(); // Stop any current speech
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.78;
-    utterance.pitch = 1.05;
+    utterance.rate = 0.75;
+    utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
     utterance.onstart = () => {
+      console.log('Speech STARTED');
       setIsSpeaking(true);
       const words = text.split(' ').length;
       const total = Math.round((words / 130) * 60);
@@ -181,11 +151,18 @@ export default function Reader({ book, onClose }: ReaderProps) {
     };
   
     utterance.onend = () => {
+      console.log('Speech ENDED');
       setIsSpeaking(false);
       setSpeechProgress(0);
       setCurrentTime(0);
       if (timerRef.current) clearInterval(timerRef.current);
     };  
+
+    utterance.onerror = (e) => {
+      console.error('Speech ERROR:', e.error);
+      setIsSpeaking(false);
+      setIsGenerating(false);
+    };
 
     utterance.onpause = () => setIsSpeaking(false);
     utterance.onresume = () => setIsSpeaking(true);
@@ -197,31 +174,23 @@ export default function Reader({ book, onClose }: ReaderProps) {
       }
     };
 
-    // Wait for voices then select best
-    const loadVoices = () => {
-      const voices = synth.getVoices();
-      const voice = 
-        voices.find(v => v.name === 'Google UK English Female') ||
-        voices.find(v => v.name === 'Google US English') ||
-        voices.find(v => v.name.includes('Samantha')) ||
-        voices.find(v => v.name.includes('Karen')) ||
-        voices.find(v => v.name.includes('Daniel')) ||
-        voices.find(v => v.lang === 'en-GB' && !v.localService) ||
-        voices.find(v => v.lang === 'en-US' && !v.localService) ||
-        voices.find(v => v.lang.startsWith('en'));
+    const voices = synth.getVoices();
+    console.log('Voices available:', voices.length);
+  
+    const voice = 
+      voices.find(v => v.name === 'Google UK English Female') ||
+      voices.find(v => v.name === 'Google US English') ||
+      voices.find(v => v.name === 'Google UK English Male') ||
+      voices.find(v => !v.localService && v.lang.startsWith('en')) ||
+      voices.find(v => v.lang === 'en-GB') ||
+      voices.find(v => v.lang === 'en-US');
       
-      if (voice) {
-        console.log("Selected voice:", voice.name);
-        utterance.voice = voice;
-      }
-      synth.speak(utterance);
-    };
-
-    if (synth.getVoices().length > 0) {
-      loadVoices();
-    } else {
-      synth.onvoiceschanged = loadVoices;
+    if (voice) {
+      console.log("Selected voice:", voice.name);
+      utterance.voice = voice;
     }
+    synth.speak(utterance);
+    console.log('synth.speaking:', synth.speaking);
   };
 
   const handleAskQuestion = async () => {

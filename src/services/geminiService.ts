@@ -16,23 +16,26 @@ export async function expandBookContent(
       model: "llama-3.1-8b-instant",
       messages: [{
         role: "user",
-        content: `You are a professional audiobook narrator. 
-        Generate EXACTLY 1700 words. Not more, not less. 
-        1700 words at 0.80 speech rate = exactly 13 minutes.
-        
-        Book: "${bookTitle}" by ${bookAuthor}
-        Summary: ${bookSummary}
-        Key Insights: ${keyInsights.join(', ')}
-        
-        Structure:
-        1. Introduction: 250 words
-        2. Each insight: 200 words with examples (6 insights = 1200 words)
-        3. Conclusion: 250 words
-        Total: 1700 words EXACTLY
-        
-        Plain text only, no markdown.`
+        content: `You are a professional audiobook narrator for "${bookTitle}" by ${bookAuthor}.
+   
+   Generate EXACTLY 1800 words of engaging narration. Count carefully.
+   
+   Summary: ${bookSummary}
+   Key Insights: ${keyInsights.join(', ')}
+   
+   Structure (must total 1800 words):
+   - Introduction: 300 words - hook the listener, introduce the book
+   - Core Concepts: 400 words - explain the main ideas
+   - Key Insight 1: 200 words with real-world example  
+   - Key Insight 2: 200 words with real-world example
+   - Key Insight 3: 200 words with real-world example
+   - Practical Application: 200 words - how to apply this
+   - Conclusion: 300 words - memorable closing thoughts
+   
+   Write in warm, conversational tone. No headers. Plain text only.
+   IMPORTANT: Must be exactly 1800 words.`
       }],
-      max_tokens: 2800,
+      max_tokens: 4000,
     });
     return response.choices[0]?.message?.content || '';
   } catch (error) {
