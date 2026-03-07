@@ -137,14 +137,22 @@ export default function Reader({ book, onClose }: ReaderProps) {
       console.log('5. textToSpeak length:', textToSpeak?.length);
       console.log('6. textToSpeak preview:', textToSpeak?.substring(0, 100));
       
-      const wordCount = textToSpeak.split(/\s+/).length;
-      const calculatedTotalTime = Math.round((wordCount / 130) * 60); // 130 words/min at 0.78 rate = exactly 13 minutes for 1700 words
-      console.log("Word count:", wordCount, "Estimated time:", calculatedTotalTime, "seconds");
-      
-      setTotalTime(calculatedTotalTime);
-      setCurrentTime(0);
-      setFullNarration(textToSpeak);
-      playSpeech(textToSpeak);
+      // Speak immediately to satisfy Chrome's user gesture requirement
+    const shortIntro = `Loading narration for ${book.title} by ${book.author}. Please wait.`;
+    const introUtterance = new SpeechSynthesisUtterance(shortIntro);
+    window.speechSynthesis.speak(introUtterance);
+
+    // Then load full content and queue it
+    const fullText = await expandBookContent(
+      book.title, book.author, book.summary, book.keyInsights
+    );
+
+    const finalTextToSpeak = fullText || `${book.title} by ${book.author}. ${book.summary}`;
+    setFullNarration(finalTextToSpeak);
+
+    // Cancel intro and speak full text
+    window.speechSynthesis.cancel();
+    playSpeech(finalTextToSpeak);
       
     } catch (error) {
       console.error("Error in narration flow:", error);
