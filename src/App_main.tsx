@@ -112,24 +112,27 @@ function MainApp() {
           <h1 className="text-2xl font-bold text-stone-900 dark:text-white">
             House of Books
           </h1>
-          <div className="relative max-w-md mx-auto mt-4 mb-6">
+          <div className="relative w-full max-w-md mx-auto">
             <input
               type="text"
               placeholder="Search books, authors, topics..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-full bg-white/10 
-              backdrop-blur-sm border border-white/20 text-white 
-              placeholder-white/50 focus:outline-none focus:border-emerald-400
-              focus:bg-white/15 transition-all text-sm"
+              className="w-full pl-10 pr-4 py-3 rounded-full 
+              bg-stone-100 dark:bg-stone-800 
+              border border-stone-200 dark:border-stone-700 
+              text-stone-900 dark:text-white 
+              placeholder-stone-400 dark:placeholder-stone-500
+              focus:outline-none focus:ring-2 focus:ring-emerald-500/30
+              focus:border-emerald-400 transition-all text-sm"
             />
             <Search size={16} className="absolute left-3.5 top-1/2 
-            -translate-y-1/2 text-white/50" />
+            -translate-y-1/2 text-stone-400" />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 
-                text-white/50 hover:text-white"
+                text-stone-400 hover:text-stone-600"
               >
                 <X size={16} />
               </button>
@@ -149,7 +152,7 @@ function MainApp() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-12">
         {filteredBooks.length === 0 ? (
-          <div className="col-span-full text-center py-20 text-white/50">
+          <div className="col-span-full text-center py-20 text-stone-500 dark:text-stone-400">
             <p className="text-lg">No books found for "{searchQuery}"</p>
             <p className="text-sm mt-2">Try searching by title, author or topic</p>
           </div>
