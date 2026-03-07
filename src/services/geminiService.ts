@@ -43,6 +43,8 @@ export async function askBookQuestion(
   chatHistory: {role: string, content: string}[]
 ): Promise<string> {
   try {
+    const filteredHistory = chatHistory.filter(m => m.content && m.content.trim() !== '');
+    
     const messages = [
       {
         role: "system" as const,
@@ -50,7 +52,7 @@ export async function askBookQuestion(
         Summary: ${bookSummary}. 
         Answer questions helpfully and conversationally.`
       },
-      ...chatHistory.map(m => ({
+      ...filteredHistory.map(m => ({
         role: m.role as "user" | "assistant",
         content: m.content
       })),

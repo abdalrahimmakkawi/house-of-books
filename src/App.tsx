@@ -122,22 +122,27 @@ export default function Reader({ book, onClose }: ReaderProps) {
       const expandedText = await expandBookContent(book.title, book.author, book.summary, book.keyInsights);
       setIsGenerating(false);
       
-      if (expandedText) {
-        const wordCount = expandedText.split(/\s+/).length;
-        const calculatedTotalTime = Math.round((wordCount / 150) * 60);
-        console.log("Narration generated. Word count:", wordCount, "Estimated time:", calculatedTotalTime, "seconds");
-        console.log("Text preview:", expandedText.substring(0, 200) + "...");
-        
-        setTotalTime(calculatedTotalTime);
-        setCurrentTime(0);
-        setFullNarration(expandedText);
-        playSpeech(expandedText);
-      } else {
-        alert("Could not generate expanded narration. Playing standard summary instead.");
-        const shortText = `${book.title} by ${book.author}. ${book.summary}`;
-        setFullNarration(shortText);
-        playSpeech(shortText);
+      console.log("expandBookContent returned:", expandedText ? "success" : "empty string");
+      console.log("Text length:", expandedText?.length || 0);
+      
+      let textToSpeak = expandedText;
+      
+      if (!expandedText || expandedText.trim() === '') {
+        console.log("Using fallback text: book.summary");
+        textToSpeak = `${book.title} by ${book.author}. ${book.summary}`;
       }
+      
+      console.log("Final text to speak length:", textToSpeak.length);
+      console.log("Text preview:", textToSpeak.substring(0, 200) + "...");
+      
+      const wordCount = textToSpeak.split(/\s+/).length;
+      const calculatedTotalTime = Math.round((wordCount / 150) * 60);
+      console.log("Word count:", wordCount, "Estimated time:", calculatedTotalTime, "seconds");
+      
+      setTotalTime(calculatedTotalTime);
+      setCurrentTime(0);
+      setFullNarration(textToSpeak);
+      playSpeech(textToSpeak);
     } catch (error) {
       console.error("Error in narration flow:", error);
       setIsGenerating(false);
@@ -217,7 +222,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
     
     setIsGeneratingBio(true);
     try {
-      const bio = await askBookQuestion(book.title, book.summary, "Tell me about the author of this book in 3 paragraphs");
+      const bio = await askBookQuestion(book.title, book.summary, "Tell me about the author of this book in 3 paragraphs", []);
       if (bio) {
         setAuthorBio(bio);
       }
