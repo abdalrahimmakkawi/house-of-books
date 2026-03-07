@@ -8,7 +8,7 @@ import { useBooks } from './hooks/useBooks';
 import { useTheme } from './contexts/ThemeContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { supabase } from './lib/supabase';
-import { Loader2, Settings, Trash2, Type } from 'lucide-react';
+import { Loader2, Settings, Trash2, Type, Search, X } from 'lucide-react';
 
 function MainApp() {
   const { books, loading } = useBooks();
@@ -19,6 +19,13 @@ function MainApp() {
   const [fontSize, setFontSize] = React.useState<'small' | 'medium' | 'large'>('medium');
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredBooks = books.filter(book =>
+    book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    book.category?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -101,10 +108,33 @@ function MainApp() {
     <div className={`min-h-screen bg-[#FDFCFB] dark:bg-stone-950 transition-colors duration-500 ${theme}`}>
       {/* Header */}
       <header className="sticky top-0 z-40 glass px-6 py-4 backdrop-blur-lg">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl mx-auto flex flex-col items-center gap-4">
           <h1 className="text-2xl font-bold text-stone-900 dark:text-white">
             House of Books
           </h1>
+          <div className="relative max-w-md mx-auto mt-4 mb-6">
+            <input
+              type="text"
+              placeholder="Search books, authors, topics..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 rounded-full bg-white/10 
+              backdrop-blur-sm border border-white/20 text-white 
+              placeholder-white/50 focus:outline-none focus:border-emerald-400
+              focus:bg-white/15 transition-all text-sm"
+            />
+            <Search size={16} className="absolute left-3.5 top-1/2 
+            -translate-y-1/2 text-white/50" />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 
+                text-white/50 hover:text-white"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-4">
             <button
               onClick={() => setShowSettings(true)}
@@ -118,18 +148,25 @@ function MainApp() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {books.map((book, index) => (
-            <motion.div
-              key={book.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <BookCard book={book} onClick={handleBookClick} />
-            </motion.div>
-          ))}
-        </div>
+        {filteredBooks.length === 0 ? (
+          <div className="col-span-full text-center py-20 text-white/50">
+            <p className="text-lg">No books found for "{searchQuery}"</p>
+            <p className="text-sm mt-2">Try searching by title, author or topic</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            {filteredBooks.map((book, index) => (
+              <motion.div
+                key={book.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <BookCard book={book} onClick={handleBookClick} />
+              </motion.div>
+            ))}
+          </div>
+        )}
       </main>
 
       {/* Settings Modal */}
