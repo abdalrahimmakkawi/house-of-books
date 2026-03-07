@@ -470,6 +470,26 @@ export default function Reader({ book, onClose }: ReaderProps) {
                 {book.readTime} min read • 8 key insights
               </div>
             </div>
+            
+            {isSpeaking && (
+              <div className="w-full mt-4 p-4 glass rounded-xl">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-sm">{formatTime(currentTime)}</span>
+                  <div className="flex-1 h-2 bg-white/20 rounded-full">
+                    <div 
+                      className="h-full bg-emerald-400 rounded-full transition-all"
+                      style={{ width: `${(currentTime/totalTime)*100}%` }}
+                    />
+                  </div>
+                  <span className="text-sm">{formatTime(totalTime)}</span>
+                </div>
+                <button onClick={() => {
+                  window.speechSynthesis.cancel();
+                  setIsSpeaking(false);
+                  if (timerRef.current) clearInterval(timerRef.current);
+                }} className="text-sm text-red-400">Stop</button>
+              </div>
+            )}
           </div>
         </div>
 
