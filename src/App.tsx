@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ChevronLeft, Bookmark, Share2, Play, Pause, BookOpen, List, Info, SkipBack, SkipForward, Volume2, Palette, Music, Loader2, MessageSquare, Send, Type, Sparkles, Settings } from 'lucide-react';
+import { X, ChevronLeft, BookOpen, List, Info, Volume2, Palette, Music, Loader2, MessageSquare, Send, Type, Sparkles, Settings } from 'lucide-react';
 import { Book, Theme, ReaderSettings } from "./types";
 import { useAudioPlayer } from "./hooks/useAudioPlayer";
 import { useTheme, AMBIENT_SOUNDS } from "./contexts/ThemeContext";
-import { generateBookNarration, askBookQuestion, expandBookContent } from "./services/geminiService";
-import { useBooks } from "./hooks/useBooks";
+import { askBookQuestion } from "./services/geminiService";
 import Paywall from "./components/Paywall";
 
 interface ReaderProps {
@@ -18,17 +17,9 @@ export default function Reader({ book, onClose }: ReaderProps) {
   const { theme, setTheme, activeAmbient, ambientVolume, setAmbientVolume, playAmbient } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [narrationUrl, setNarrationUrl] = useState<string | null>(null);
-  const [fullNarration, setFullNarration] = useState<string | null>(null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [speechProgress, setSpeechProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [totalTime, setTotalTime] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  
+
   const isPremium = localStorage.getItem('isPremium') === 'true';
-  
+
   // Typography Settings
   const [settings, setSettings] = useState<ReaderSettings>(() => {
     const saved = localStorage.getItem('reader-settings');
@@ -42,7 +33,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
   const [isAsking, setIsAsking] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const readerRef = useRef<HTMLDivElement>(null);
-  
+
   // Tab State
   const [activeTab, setActiveTab] = useState<'summary' | 'insights' | 'author'>('summary');
   const [authorBio, setAuthorBio] = useState<string>('');
@@ -71,131 +62,9 @@ export default function Reader({ book, onClose }: ReaderProps) {
     localStorage.setItem(`progress-${book.id}`, scrollTop.toString());
   };
 
-  useEffect(() => {
-    if (isSpeaking) {
-      timerRef.current = setInterval(() => {
-        setCurrentTime(prev => {
-          if (prev < totalTime) return prev + 1;
-          return prev;
-        });
-      }, 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isSpeaking, totalTime]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleStartNarration = async () => {
-  if (book.isPremium && !isPremium) {
-    setShowPaywall(true);
-    return;
-  }
-
-  if (isSpeaking) {
-    const synth = window.speechSynthesis;
-    if (synth.paused) {
-      synth.resume();
-    } else {
-      synth.pause();
-    }
-    return;
-  }
-
-  if (fullNarration) {
-    playSpeech(fullNarration);
-    return;
-  }
-
-  setIsGenerating(true);
-  
-  const expandedText = await expandBookContent(
-    book.title, book.author, book.summary, book.keyInsights
-  );
-  
-  const textToSpeak = expandedText?.trim() 
-    || `${book.title} by ${book.author}. ${book.summary}`;
-  
-  setFullNarration(textToSpeak);
-  setIsGenerating(false);
-  playSpeech(textToSpeak);
-};
-
-  const playSpeech = (text: string) => {
-    console.log('playSpeech called, text length:', text.length);
-    const synth = window.speechSynthesis;
-    synth.cancel(); // Stop any current speech
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.75;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-
-    utterance.onstart = () => {
-      console.log('Speech STARTED');
-      setIsSpeaking(true);
-      const words = text.split(' ').length;
-      const total = Math.round((words / 130) * 60);
-      setTotalTime(total);
-      setCurrentTime(0);
-      timerRef.current = setInterval(() => {
-        setCurrentTime(prev => prev + 1);
-      }, 1000);
-    };
-  
-    utterance.onend = () => {
-      console.log('Speech ENDED');
-      setIsSpeaking(false);
-      setSpeechProgress(0);
-      setCurrentTime(0);
-      if (timerRef.current) clearInterval(timerRef.current);
-    };  
-
-    utterance.onerror = (e) => {
-      console.error('Speech ERROR:', e.error);
-      setIsSpeaking(false);
-      setIsGenerating(false);
-    };
-
-    utterance.onpause = () => setIsSpeaking(false);
-    utterance.onresume = () => setIsSpeaking(true);
-    
-    utterance.onboundary = (event) => {
-      if (event.name === 'word') {
-        const progress = (event.charIndex / text.length) * 100;
-        setSpeechProgress(progress);
-      }
-    };
-
-    const voices = synth.getVoices();
-    console.log('Voices available:', voices.length);
-  
-    const voice = 
-      voices.find(v => v.name === 'Google UK English Female') ||
-      voices.find(v => v.name === 'Google US English') ||
-      voices.find(v => v.name === 'Google UK English Male') ||
-      voices.find(v => !v.localService && v.lang.startsWith('en')) ||
-      voices.find(v => v.lang === 'en-GB') ||
-      voices.find(v => v.lang === 'en-US');
-      
-    if (voice) {
-      console.log("Selected voice:", voice.name);
-      utterance.voice = voice;
-    }
-    synth.speak(utterance);
-    console.log('synth.speaking:', synth.speaking);
-  };
-
   const handleAskQuestion = async () => {
     if (!chatQuestion.trim() || isAsking) return;
-    
+
     if (book.isPremium && !isPremium) {
       setShowPaywall(true);
       return;
@@ -216,7 +85,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
 
   const generateAuthorBio = async () => {
     if (authorBio || isGeneratingBio) return;
-    
+
     setIsGeneratingBio(true);
     try {
       const bio = await askBookQuestion(book.title, book.summary, "Tell me about the author of this book in 3 paragraphs", []);
@@ -246,7 +115,6 @@ export default function Reader({ book, onClose }: ReaderProps) {
       text: `Check out these key insights from "${book.title}" by ${book.author} on House of Books!`,
       url: window.location.href,
     };
-
     try {
       if (navigator.share) {
         await navigator.share(shareData);
@@ -270,7 +138,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
     >
       {/* Header */}
       <header className="sticky top-0 z-40 glass px-6 py-4 flex items-center justify-between">
-        <button 
+        <button
           onClick={onClose}
           className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-full transition-colors"
         >
@@ -330,8 +198,8 @@ export default function Reader({ book, onClose }: ReaderProps) {
                 <div className="space-y-4">
                   <div className="flex items-center gap-4">
                     <span className="text-xs font-bold text-stone-500 w-12">Size</span>
-                    <input 
-                      type="range" min="14" max="24" step="1" 
+                    <input
+                      type="range" min="14" max="24" step="1"
                       value={settings.fontSize}
                       onChange={(e) => setSettings({...settings, fontSize: parseInt(e.target.value)})}
                       className="flex-grow accent-emerald-600"
@@ -340,8 +208,8 @@ export default function Reader({ book, onClose }: ReaderProps) {
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-xs font-bold text-stone-500 w-12">Height</span>
-                    <input 
-                      type="range" min="1.2" max="2.0" step="0.1" 
+                    <input
+                      type="range" min="1.2" max="2.0" step="0.1"
                       value={settings.lineHeight}
                       onChange={(e) => setSettings({...settings, lineHeight: parseFloat(e.target.value)})}
                       className="flex-grow accent-emerald-600"
@@ -349,13 +217,13 @@ export default function Reader({ book, onClose }: ReaderProps) {
                     <span className="text-xs font-bold text-stone-500">{settings.lineHeight}</span>
                   </div>
                   <div className="flex gap-2">
-                    <button 
+                    <button
                       onClick={() => setSettings({...settings, fontFamily: 'serif'})}
                       className={`flex-grow py-2 rounded-lg text-xs font-bold border ${settings.fontFamily === 'serif' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-stone-200 dark:border-stone-700 text-stone-500'}`}
                     >
                       Serif
                     </button>
-                    <button 
+                    <button
                       onClick={() => setSettings({...settings, fontFamily: 'sans'})}
                       className={`flex-grow py-2 rounded-lg text-xs font-bold border ${settings.fontFamily === 'sans' ? 'bg-emerald-600 text-white border-emerald-600' : 'border-stone-200 dark:border-stone-700 text-stone-500'}`}
                     >
@@ -394,9 +262,9 @@ export default function Reader({ book, onClose }: ReaderProps) {
                 {activeAmbient !== 'none' && (
                   <div className="mt-4 flex items-center gap-3">
                     <Volume2 size={14} className="text-stone-400" />
-                    <input 
-                      type="range" 
-                      min="0" max="1" step="0.01" 
+                    <input
+                      type="range"
+                      min="0" max="1" step="0.01"
                       value={ambientVolume}
                       onChange={(e) => setAmbientVolume(parseFloat(e.target.value))}
                       className="flex-grow accent-amber-600"
@@ -421,7 +289,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
               referrerPolicy="no-referrer"
             />
           </div>
-          
+
           <div className="flex flex-col justify-center">
             <span className="text-xs font-bold text-emerald-600 nature:text-emerald-400 uppercase tracking-widest mb-2">
               {book.category}
@@ -432,125 +300,53 @@ export default function Reader({ book, onClose }: ReaderProps) {
             <p className="text-xl text-stone-500 italic mb-6 nature:text-stone-400 classic:text-stone-400">
               by {book.author}
             </p>
-            
+
+            {/* Audio Coming Soon Badge */}
             <div className="flex flex-wrap gap-4 items-center">
-              <button 
-                disabled={isGenerating}
-                onClick={handleStartNarration}
-                className="bg-emerald-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-              >
-                {isGenerating ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (isSpeaking || isPlaying) ? (
-                  <Pause size={18} fill="currentColor" />
-                ) : (
-                  <Play size={18} fill="currentColor" />
-                )}
-                {isGenerating ? 'Generating Narration...' : (isSpeaking || isPlaying) ? 'Pause Narration' : 'Listen to Summary'}
-              </button>
+              <div className="flex items-center gap-3 bg-stone-100 dark:bg-stone-800 px-5 py-3 rounded-full">
+                <span className="text-lg">🎧</span>
+                <div>
+                  <p className="text-sm font-semibold text-stone-700 dark:text-stone-300">Audio Narrations</p>
+                  <p className="text-xs text-emerald-600 font-medium">Coming Soon</p>
+                </div>
+                <span className="bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-full">Soon</span>
+              </div>
               <div className="text-sm text-stone-400 font-medium">
                 {book.readTime} min read • 8 key insights
               </div>
             </div>
-            
-            {isSpeaking && (
-              <div className="w-full mt-4 p-3 bg-black/30 rounded-xl">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs text-white">{formatTime(currentTime)}</span>
-                  <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-emerald-400 rounded-full"
-                      style={{ width: `${totalTime > 0 ? (currentTime/totalTime)*100 : 0}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-white">{formatTime(totalTime)}</span>
-                </div>
-                <button 
-                  onClick={() => {
-                    window.speechSynthesis.cancel();
-                    setIsSpeaking(false);
-                    if (timerRef.current) clearInterval(timerRef.current);
-                  }} 
-                  className="text-xs text-red-400 hover:text-red-300">
-                  ■ Stop
-                </button>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Audio Player Bar (Floating when playing) */}
-        <AnimatePresence>
-          {(isPlaying || isSpeaking) && (
-            <motion.div 
-              initial={{ y: 100 }}
-              animate={{ y: 0 }}
-              exit={{ y: 100 }}
-              className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl glass rounded-2xl p-4 shadow-2xl z-50"
-            >
-              <div className="flex items-center gap-4">
-                <img src={book.coverUrl} alt="" className="w-12 h-12 rounded-lg object-cover" />
-                <div className="flex-grow">
-                  <div className="flex justify-between items-center mb-1">
-                    <p className="text-xs font-bold dark:text-white nature:text-emerald-50 truncate max-w-[150px]">{book.title}</p>
-                    <div className="flex items-center gap-4">
-                      <span className="text-[10px] font-mono text-stone-400">
-                        {isSpeaking ? `${formatTime(currentTime)} / ${formatTime(totalTime)}` : '0:00 / 0:00'}
-                      </span>
-                      <SkipBack size={16} className="text-stone-400 cursor-pointer hover:text-stone-600" />
-                      <button onClick={() => isSpeaking ? handleStartNarration() : togglePlay()}>
-                        {(isPlaying || isSpeaking) ? <Pause size={20} className="dark:text-white nature:text-emerald-50" /> : <Play size={20} className="dark:text-white nature:text-emerald-50" />}
-                      </button>
-                      <SkipForward size={16} className="text-stone-400 cursor-pointer hover:text-stone-600" />
-                    </div>
-                  </div>
-                  <div className="relative h-1 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden cursor-pointer" onClick={(e) => {
-                    if (!isSpeaking && !isPlaying) return; // Only allow seeking when audio is active
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    seek((x / rect.width) * 100);
-                  }}>
-                    <div 
-                      className="absolute top-0 left-0 h-full bg-emerald-600 transition-all duration-100"
-                      style={{ width: `${(isSpeaking || isPlaying) ? speechProgress : progress}%` }}
-                    />
-                  </div>
-                </div>
-                <Volume2 size={18} className="text-stone-400 hidden sm:block" />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Content Tabs */}
         <div className="border-b border-stone-200 dark:border-stone-800 mb-12 flex gap-8">
-          <button 
+          <button
             onClick={() => setActiveTab('summary')}
             className={`pb-4 border-b-2 font-semibold flex items-center gap-2 transition-colors ${
-              activeTab === 'summary' 
-                ? 'border-emerald-600 text-emerald-600' 
+              activeTab === 'summary'
+                ? 'border-emerald-600 text-emerald-600'
                 : 'border-transparent text-stone-400 hover:text-stone-600'
             }`}
           >
             <BookOpen size={18} />
             Summary
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('insights')}
             className={`pb-4 border-b-2 font-semibold flex items-center gap-2 transition-colors ${
-              activeTab === 'insights' 
-                ? 'border-emerald-600 text-emerald-600' 
+              activeTab === 'insights'
+                ? 'border-emerald-600 text-emerald-600'
                 : 'border-transparent text-stone-400 hover:text-stone-600'
             }`}
           >
             <List size={18} />
             Key Insights
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('author')}
             className={`pb-4 border-b-2 font-semibold flex items-center gap-2 transition-colors ${
-              activeTab === 'author' 
-                ? 'border-emerald-600 text-emerald-600' 
+              activeTab === 'author'
+                ? 'border-emerald-600 text-emerald-600'
                 : 'border-transparent text-stone-400 hover:text-stone-600'
             }`}
           >
@@ -560,9 +356,9 @@ export default function Reader({ book, onClose }: ReaderProps) {
         </div>
 
         {/* Text Content */}
-        <article 
+        <article
           className={`prose prose-stone dark:prose-invert nature:prose-emerald classic:prose-amber max-w-none ${settings.fontFamily === 'serif' ? 'font-serif' : 'font-sans'}`}
-          style={{ 
+          style={{
             fontSize: `${settings.fontSize}px`,
             lineHeight: settings.lineHeight
           }}
@@ -575,7 +371,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
               </p>
             </>
           )}
-          
+
           {activeTab === 'insights' && (
             <>
               <h2 className="font-serif text-3xl mb-6 dark:text-white nature:text-emerald-50 classic:text-amber-50">Key Insights</h2>
@@ -593,7 +389,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
               </div>
             </>
           )}
-          
+
           {activeTab === 'author' && (
             <>
               <h2 className="font-serif text-3xl mb-6 dark:text-white nature:text-emerald-50 classic:text-amber-50">About the Author</h2>
@@ -618,13 +414,13 @@ export default function Reader({ book, onClose }: ReaderProps) {
       </div>
 
       {/* AI Chat Button */}
-      <button 
+      <button
         onClick={() => setShowChat(true)}
         className="fixed bottom-8 right-8 w-14 h-14 bg-emerald-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-emerald-700 transition-all z-40 group"
       >
         <MessageSquare size={24} />
         <span className="absolute right-full mr-4 bg-stone-900 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-          Ask Gemini about this book
+          Ask about this book
         </span>
       </button>
 
@@ -632,7 +428,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
       <AnimatePresence>
         {showChat && (
           <>
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -653,10 +449,10 @@ export default function Reader({ book, onClose }: ReaderProps) {
                   </div>
                   <div>
                     <h3 className="font-bold dark:text-white">Book Assistant</h3>
-                    <p className="text-xs text-stone-500">Powered by Gemini</p>
+                    <p className="text-xs text-stone-500">Powered by AI</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setShowChat(false)}
                   className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-full transition-colors"
                 >
@@ -673,12 +469,9 @@ export default function Reader({ book, onClose }: ReaderProps) {
                     <p className="text-stone-500 text-sm">Ask anything about "{book.title}"</p>
                     <div className="mt-6 flex flex-wrap justify-center gap-2">
                       {['What is the main takeaway?', 'Explain the 3rd insight', 'How can I apply this?'].map(q => (
-                        <button 
+                        <button
                           key={q}
-                          onClick={() => {
-                            setChatQuestion(q);
-                            // Auto-send if we want, or just set it
-                          }}
+                          onClick={() => setChatQuestion(q)}
                           className="text-xs bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 px-3 py-1.5 rounded-full text-stone-600 dark:text-stone-400 transition-colors"
                         >
                           {q}
@@ -690,8 +483,8 @@ export default function Reader({ book, onClose }: ReaderProps) {
                 {chatHistory.map((msg, i) => (
                   <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[85%] p-4 rounded-2xl text-sm ${
-                      msg.role === 'user' 
-                      ? 'bg-emerald-600 text-white rounded-tr-none' 
+                      msg.role === 'user'
+                      ? 'bg-emerald-600 text-white rounded-tr-none'
                       : 'bg-stone-100 dark:bg-stone-800 text-stone-800 dark:text-stone-200 rounded-tl-none'
                     }`}>
                       {msg.text}
@@ -710,7 +503,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
 
               <div className="p-6 border-t border-stone-200 dark:border-stone-800">
                 <div className="relative">
-                  <input 
+                  <input
                     type="text"
                     placeholder="Ask a question..."
                     value={chatQuestion}
@@ -718,7 +511,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
                     onKeyDown={(e) => e.key === 'Enter' && handleAskQuestion()}
                     className="w-full pl-4 pr-12 py-3 bg-stone-100 dark:bg-stone-800 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 dark:text-white"
                   />
-                  <button 
+                  <button
                     onClick={handleAskQuestion}
                     disabled={!chatQuestion.trim() || isAsking}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
