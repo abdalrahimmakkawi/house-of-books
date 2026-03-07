@@ -17,17 +17,22 @@ export async function expandBookContent(
       messages: [{
         role: "user",
         content: `You are a professional audiobook narrator. 
-        Expand this into exactly 1500-2000 words of engaging narration.
+        Generate EXACTLY 1700 words. Not more, not less. 
+        1700 words at 0.80 speech rate = exactly 13 minutes.
+        
         Book: "${bookTitle}" by ${bookAuthor}
         Summary: ${bookSummary}
         Key Insights: ${keyInsights.join(', ')}
+        
         Structure:
-        1. Introduction: 200-300 words
-        2. Each insight: 150-200 words with examples
-        3. Conclusion: 150-200 words
+        1. Introduction: 250 words
+        2. Each insight: 200 words with examples (6 insights = 1200 words)
+        3. Conclusion: 250 words
+        Total: 1700 words EXACTLY
+        
         Plain text only, no markdown.`
       }],
-      max_tokens: 2500,
+      max_tokens: 2800,
     });
     return response.choices[0]?.message?.content || '';
   } catch (error) {

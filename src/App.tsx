@@ -99,6 +99,10 @@ export default function Reader({ book, onClose }: ReaderProps) {
       return;
     }
 
+    console.log('1. handleStartNarration called');
+    console.log('2. book.summary:', book.summary?.length, 'chars');
+    console.log('3. book.keyInsights:', book.keyInsights?.length, 'items');
+
     const synth = window.speechSynthesis;
 
     // If already speaking, handle pause/resume
@@ -111,7 +115,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
       return;
     }
 
-    // If we have the narration text already, just play it
+    // If we have narration text already, just play it
     if (fullNarration) {
       playSpeech(fullNarration);
       return;
@@ -120,10 +124,8 @@ export default function Reader({ book, onClose }: ReaderProps) {
     setIsGenerating(true);
     try {
       const expandedText = await expandBookContent(book.title, book.author, book.summary, book.keyInsights);
+      console.log('4. expandedText length:', expandedText?.length);
       setIsGenerating(false);
-      
-      console.log("expandBookContent returned:", expandedText ? "success" : "empty string");
-      console.log("Text length:", expandedText?.length || 0);
       
       let textToSpeak = expandedText;
       
@@ -132,17 +134,25 @@ export default function Reader({ book, onClose }: ReaderProps) {
         textToSpeak = `${book.title} by ${book.author}. ${book.summary}`;
       }
       
-      console.log("Final text to speak length:", textToSpeak.length);
-      console.log("Text preview:", textToSpeak.substring(0, 200) + "...");
+      console.log('5. textToSpeak length:', textToSpeak?.length);
+      console.log('6. textToSpeak preview:', textToSpeak?.substring(0, 100));
       
       const wordCount = textToSpeak.split(/\s+/).length;
-      const calculatedTotalTime = Math.round((wordCount / 150) * 60);
+      const calculatedTotalTime = Math.round((wordCount / 130) * 60); // 130 words/min at 0.78 rate = exactly 13 minutes for 1700 words
       console.log("Word count:", wordCount, "Estimated time:", calculatedTotalTime, "seconds");
       
       setTotalTime(calculatedTotalTime);
       setCurrentTime(0);
       setFullNarration(textToSpeak);
-      playSpeech(textToSpeak);
+      
+      // Make sure speech is actually called:
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      utterance.rate = 0.80;
+      console.log('7. Starting speech synthesis...');
+      window.speechSynthesis.cancel(); // Cancel any existing speech
+      window.speechSynthesis.speak(utterance);
+      console.log('8. Speech synthesis started');
+      
     } catch (error) {
       console.error("Error in narration flow:", error);
       setIsGenerating(false);
@@ -154,8 +164,9 @@ export default function Reader({ book, onClose }: ReaderProps) {
     synth.cancel(); // Stop any current speech
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.80;
-    utterance.lang = 'en-US';
+    utterance.rate = 0.78;
+    utterance.pitch = 1.05;
+    utterance.volume = 1.0;
 
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => {
@@ -176,15 +187,19 @@ export default function Reader({ book, onClose }: ReaderProps) {
     // Wait for voices then select best
     const loadVoices = () => {
       const voices = synth.getVoices();
-      const best = 
+      const voice = 
+        voices.find(v => v.name === 'Google UK English Female') ||
         voices.find(v => v.name === 'Google US English') ||
         voices.find(v => v.name.includes('Samantha')) ||
+        voices.find(v => v.name.includes('Karen')) ||
+        voices.find(v => v.name.includes('Daniel')) ||
+        voices.find(v => v.lang === 'en-GB' && !v.localService) ||
         voices.find(v => v.lang === 'en-US' && !v.localService) ||
         voices.find(v => v.lang.startsWith('en'));
       
-      if (best) {
-        console.log("Selected voice:", best.name);
-        utterance.voice = best;
+      if (voice) {
+        console.log("Selected voice:", voice.name);
+        utterance.voice = voice;
       }
       synth.speak(utterance);
     };
@@ -484,14 +499,14 @@ export default function Reader({ book, onClose }: ReaderProps) {
                     </div>
                   </div>
                   <div className="relative h-1 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden cursor-pointer" onClick={(e) => {
-                    if (isSpeaking) return; // Speech synthesis doesn't support easy seeking this way
+                    if (!isSpeaking && !isPlaying) return; // Only allow seeking when audio is active
                     const rect = e.currentTarget.getBoundingClientRect();
                     const x = e.clientX - rect.left;
                     seek((x / rect.width) * 100);
                   }}>
                     <div 
                       className="absolute top-0 left-0 h-full bg-emerald-600 transition-all duration-100"
-                      style={{ width: `${isSpeaking ? speechProgress : progress}%` }}
+                      style={{ width: `${(isSpeaking || isPlaying) ? speechProgress : progress}%` }}
                     />
                   </div>
                 </div>
