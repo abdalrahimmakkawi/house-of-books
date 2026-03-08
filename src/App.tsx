@@ -4,7 +4,6 @@ import { X, ChevronLeft, BookOpen, List, Info, Volume2, Palette, Music, Loader2,
 import { Book, Theme, ReaderSettings } from "./types";
 import { useAudioPlayer } from "./hooks/useAudioPlayer";
 import { useTheme, AMBIENT_SOUNDS } from "./contexts/ThemeContext";
-import { askBookQuestion } from "./services/geminiService";
 import Paywall from "./components/Paywall";
 
 interface ReaderProps {
@@ -75,11 +74,32 @@ export default function Reader({ book, onClose }: ReaderProps) {
     setChatHistory(prev => [...prev, { role: 'user', text: question }]);
     setIsAsking(true);
 
-    const answer = await askBookQuestion(book.title, book.summary, question, chatHistory);
-    setIsAsking(false);
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyB9JmVxDeRJ_WFQSKvUXe_gi6jRqmSqvfg`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ 
+              parts: [{ 
+                text: `You are an expert on the book "${book.title}" by ${book.author}. Here's a summary: ${book.summary}. Answer this question helpfully and conversationally: ${question}` 
+              }] 
+            }]
+          })
+        }
+      );
 
-    if (answer) {
-      setChatHistory(prev => [...prev, { role: 'ai', text: answer }]);
+      const data = await response.json();
+      const reply = data.candidates[0].content.parts[0].text;
+      
+      setIsAsking(false);
+      if (reply) {
+        setChatHistory(prev => [...prev, { role: 'ai', text: reply }]);
+      }
+    } catch (error) {
+      console.error('Error asking question:', error);
+      setIsAsking(false);
     }
   };
 
@@ -88,12 +108,29 @@ export default function Reader({ book, onClose }: ReaderProps) {
 
     setIsGeneratingBio(true);
     try {
-      const bio = await askBookQuestion(book.title, book.summary, "Tell me about the author of this book in 3 paragraphs", []);
-      if (bio) {
-        setAuthorBio(bio);
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyB9JmVxDeRJ_WFQSKvUXe_gi6jRqmSqvfg`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ 
+              parts: [{ 
+                text: `Give me a detailed summary of the book "${book.title}" by ${book.author}. Cover main themes, key insights, and practical takeaways. Format with clear paragraphs.` 
+              }] 
+            }]
+          })
+        }
+      );
+
+      const data = await response.json();
+      const summary = data.candidates[0].content.parts[0].text;
+      
+      if (summary) {
+        setAuthorBio(summary);
       }
     } catch (error) {
-      setAuthorBio(`${book.author} is the author of "${book.title}". This book provides valuable insights and perspectives that have helped countless readers achieve personal and professional growth.`);
+      console.error('Error generating summary:', error);
     } finally {
       setIsGeneratingBio(false);
     }
@@ -365,7 +402,26 @@ export default function Reader({ book, onClose }: ReaderProps) {
         >
           {activeTab === 'summary' && (
             <>
-              <h2 className="font-serif text-3xl mb-6 dark:text-white nature:text-emerald-50 classic:text-amber-50">Introduction</h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="font-serif text-3xl dark:text-white nature:text-emerald-50 classic:text-amber-50">Introduction</h2>
+                <button
+                  onClick={generateAuthorBio}
+                  disabled={isGeneratingBio}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                >
+                  {isGeneratingBio ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span className="ml-2">Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={18} />
+                      <span className="ml-2">Generate AI Summary</span>
+                    </>
+                  )}
+                </button>
+              </div>
               <p className="text-stone-700 dark:text-stone-300 nature:text-emerald-100/80 classic:text-amber-100/80 leading-relaxed mb-8">
                 {book.longSummary || book.summary || 'Summary coming soon'}
               </p>
