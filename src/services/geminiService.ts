@@ -1,9 +1,7 @@
-import Groq from 'groq-sdk';
+// Direct fetch to Groq API - no npm packages required
 
-const groq = new Groq({ 
-  apiKey: import.meta.env.VITE_GROQ_API_KEY,
-  dangerouslyAllowBrowser: true 
-});
+const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+const GROQ_MODEL = 'llama3-8b-8192';
 
 export async function expandBookContent(
   bookTitle: string,
@@ -12,11 +10,17 @@ export async function expandBookContent(
   keyInsights: string[]
 ): Promise<string> {
   try {
-    const response = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [{
-        role: "user",
-        content: `You are a professional audiobook narrator for "${bookTitle}" by ${bookAuthor}.
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [{
+          role: "user",
+          content: `You are a professional audiobook narrator for "${bookTitle}" by ${bookAuthor}.
 
 Generate EXACTLY 780 words of engaging narration. Count carefully.
 
@@ -33,10 +37,13 @@ Structure (must total 780 words):
 
 Warm, conversational tone. No headers. Plain text only.
 EXACTLY 780 words.`
-      }],
-      max_tokens: 1500,
+        }],
+        max_tokens: 1500,
+      })
     });
-    return response.choices[0]?.message?.content || '';
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || '';
   } catch (error) {
     console.error('Error expanding book content:', error);
     return '';
@@ -65,12 +72,22 @@ export async function askBookQuestion(
       })),
       { role: "user" as const, content: question }
     ];
-    const response = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages,
-      max_tokens: 1000,
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages,
+        max_tokens: 1000,
+      })
     });
-    return response.choices[0]?.message?.content || '';
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || '';
   } catch (error) {
     console.error('Error asking book question:', error);
     return '';
@@ -82,18 +99,56 @@ export async function generateBookNarration(
   bookAuthor: string
 ): Promise<string> {
   try {
-    const response = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [{
-        role: "user",
-        content: `Generate a 200 word engaging introduction 
-        for the book "${bookTitle}" by ${bookAuthor}.`
-      }],
-      max_tokens: 300,
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [{
+          role: "user",
+          content: `Generate a 200 word engaging introduction 
+          for the book "${bookTitle}" by ${bookAuthor}.`
+        }],
+        max_tokens: 300,
+      })
     });
-    return response.choices[0]?.message?.content || '';
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || '';
   } catch (error) {
     console.error('Error generating narration:', error);
+    return '';
+  }
+}
+
+export async function generateAISummary(
+  bookTitle: string,
+  bookAuthor: string
+): Promise<string> {
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [{
+          role: "user",
+          content: `Give me a detailed summary of the book "${bookTitle}" by ${bookAuthor}. Cover main themes, key insights, and practical takeaways. Format with clear paragraphs.`
+        }],
+        max_tokens: 1000,
+      })
+    });
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || '';
+  } catch (error) {
+    console.error('Error generating AI summary:', error);
     return '';
   }
 }
