@@ -367,7 +367,7 @@ export default function Reader({ book, onClose }: ReaderProps) {
             <>
               <h2 className="font-serif text-3xl mb-6 dark:text-white nature:text-emerald-50 classic:text-amber-50">Introduction</h2>
               <p className="text-stone-700 dark:text-stone-300 nature:text-emerald-100/80 classic:text-amber-100/80 leading-relaxed mb-8">
-                {book.summary || book.longSummary || 'Summary coming soon'}
+                {book.longSummary || book.summary || 'Summary coming soon'}
               </p>
             </>
           )}
